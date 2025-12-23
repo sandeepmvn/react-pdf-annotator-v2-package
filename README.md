@@ -54,14 +54,27 @@ function App() {
 export default App;
 ```
 
+### Read-only Mode
+
+To display a PDF without annotation tools (view-only mode):
+
+```tsx
+<PdfViewer 
+  fileUrl="https://example.com/sample.pdf" 
+  fileName="sample.pdf" 
+  readonly={true}
+/>
+```
+
 ## 📖 API Reference
 
 ### PdfViewer Props
 
-| Prop | Type | Required | Description |
-|------|------|----------|-------------|
-| `fileUrl` | `string` | Yes | URL of the PDF file to display |
-| `fileName` | `string` | Yes | Name of the PDF file (used for downloads) |
+| Prop | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `fileUrl` | `string` | Yes | - | URL of the PDF file to display |
+| `fileName` | `string` | Yes | - | Name of the PDF file (used for downloads) |
+| `readonly` | `boolean` | No | `false` | Hide annotation tools and prevent editing |
 
 ### Available Exports
 
@@ -175,7 +188,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📮 Issues
 
-If you encounter any issues or have suggestions, please file an issue on the [GitHub repository](https://github.com/yourusername/react-pdf-annotator-v2/issues).
+If you encounter any issues or have suggestions, please file an issue on the [GitHub repository](https://github.com/sandeepmvn/react-pdf-annotator-v2-package/issues).
 
 ## 🙏 Acknowledgments
 
@@ -187,7 +200,7 @@ Built with:
 
 ## 📚 Documentation
 
-For more detailed documentation and examples, visit the [documentation site](https://github.com/yourusername/react-pdf-annotator-v2).
+For more detailed documentation and examples, visit the [documentation site](https://github.com/sandeepmvn/react-pdf-annotator-v2-package).
 
 ---
 

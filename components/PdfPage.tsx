@@ -21,6 +21,7 @@ interface PdfPageProps {
   signatureData: string | null;
   initialsData: string | null;
   activeStamp: string;
+  readonly?: boolean;
 }
 
 const PdfPage: React.FC<PdfPageProps> = (props) => {

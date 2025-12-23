@@ -22,6 +22,7 @@ interface AnnotationLayerProps {
   signatureData: string | null;
   initialsData: string | null;
   activeStamp: string;
+  readonly?: boolean;
 }
 
 const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
@@ -29,7 +30,8 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
     width, height, zoom, activeTool, toolColor, strokeWidth, fontSize,
     addAnnotation, annotations, deleteAnnotation, updateAnnotation,
     selectedAnnotationId, setSelectedAnnotationId,
-    signatureData, initialsData, activeStamp
+    signatureData, initialsData, activeStamp,
+    readonly = false
   } = props;
 
   const [interaction, setInteraction] = useState<{
@@ -52,6 +54,8 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
   };
 
   const handleMouseDown = (e: ReactMouseEvent) => {
+    if (readonly) return;
+    
     const pos = getMousePos(e);
 
     if (activeTool === 'SELECT') {
@@ -94,6 +98,8 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
   };
 
   const handleMouseMove = (e: ReactMouseEvent) => {
+    if (readonly) return;
+    
     const currentPos = getMousePos(e);
     
     if (interaction.mode === 'moving' && interaction.originalAnnotation) {
@@ -127,6 +133,8 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
   };
 
   const handleMouseUp = () => {
+    if (readonly) return;
+    
     if (interaction.mode === 'moving' || interaction.mode === 'resizing') {
         if (tempAnnotation) {
             updateAnnotation(tempAnnotation);
@@ -141,6 +149,7 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
   };
 
   const handleSvgClick = (e: ReactMouseEvent) => {
+    if (readonly) return;
     if (interaction.mode !== 'none') return;
     const pos = getMousePos(e);
     
@@ -160,6 +169,7 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
   };
 
   const handleTextBlur = () => {
+    if (readonly) return;
     if (!isTexting || !textInputRef.current) return;
     const content = textInputRef.current.value.trim();
     if (content) {

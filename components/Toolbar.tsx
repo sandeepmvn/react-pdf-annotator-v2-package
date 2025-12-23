@@ -36,6 +36,7 @@ interface ToolbarProps {
   onInitialsClick: () => void;
   activeStamp: string;
   setActiveStamp: (stamp: string) => void;
+  readonly?: boolean;
 }
 
 const ToolButton: React.FC<{
@@ -63,7 +64,8 @@ const Toolbar: React.FC<ToolbarProps> = (props) => {
     fileName, currentPage, totalPages, zoom, setZoom, setCurrentPage, activeTool, setActiveTool,
     toolColor, setToolColor, strokeWidth, setStrokeWidth, fontSize, setFontSize,
     onDownload, onPrint, isProcessing, onDelete, selectedAnnotationId,
-    undo, redo, canUndo, canRedo, onSignatureClick, onInitialsClick, activeStamp, setActiveStamp
+    undo, redo, canUndo, canRedo, onSignatureClick, onInitialsClick, activeStamp, setActiveStamp,
+    readonly = false
   } = props;
 
   const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,16 +117,20 @@ const Toolbar: React.FC<ToolbarProps> = (props) => {
         </div>
         {/* Actions */}
         <div className="flex items-center gap-2">
-          <ToolButton label="Undo" onClick={undo} disabled={!canUndo}><UndoIcon /></ToolButton>
-          <ToolButton label="Redo" onClick={redo} disabled={!canRedo}><RedoIcon /></ToolButton>
-          <div className="w-px h-6 bg-gray-700"></div>
+          {!readonly && (
+            <>
+              <ToolButton label="Undo" onClick={undo} disabled={!canUndo}><UndoIcon /></ToolButton>
+              <ToolButton label="Redo" onClick={redo} disabled={!canRedo}><RedoIcon /></ToolButton>
+              <div className="w-px h-6 bg-gray-700"></div>
+            </>
+          )}
           <ToolButton label="Print" onClick={onPrint} disabled={isProcessing}><PrintIcon /></ToolButton>
           <ToolButton label="Download" onClick={onDownload} disabled={isProcessing}><DownloadIcon /></ToolButton>
         </div>
       </div>
-      <div className="w-full h-px bg-gray-700"></div>
+      {!readonly && <div className="w-full h-px bg-gray-700"></div>}
       {/* Toolsets */}
-      <div className="flex items-center justify-center gap-4 flex-wrap">
+      {!readonly && <div className="flex items-center justify-center gap-4 flex-wrap">
         {/* Annotate */}
         <div className="flex items-center gap-1 bg-gray-800 p-1 rounded-lg">
           {annotationTools.map(t => <ToolButton key={t.tool} label={t.label} isActive={activeTool === t.tool} onClick={() => setActiveTool(t.tool)}>{t.icon}</ToolButton>)}
@@ -162,7 +168,7 @@ const Toolbar: React.FC<ToolbarProps> = (props) => {
             {FONT_SIZES.map(s => <option key={s} value={s}>{s}pt</option>)}
           </select>
         </div>
-      </div>
+      </div>}
     </header>
   );
 };

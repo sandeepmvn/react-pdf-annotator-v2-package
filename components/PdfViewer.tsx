@@ -15,9 +15,10 @@ declare const pdfjsLib: any;
 interface PdfViewerProps {
   fileUrl: string;
   fileName: string;
+  readonly?: boolean;
 }
 
-const PdfViewer: React.FC<PdfViewerProps> = ({ fileUrl, fileName }) => {
+const PdfViewer: React.FC<PdfViewerProps> = ({ fileUrl, fileName, readonly = false }) => {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -276,7 +277,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ fileUrl, fileName }) => {
     const pages = [];
     for (let i = 1; i <= totalPages; i++) {
       pages.push(
-        <div key={i} ref={el => pageRefs.current[i - 1] = el} data-page-number={i}>
+        <div key={i} ref={el => { pageRefs.current[i - 1] = el; }} data-page-number={i}>
             <PdfPage
               pdf={pdf}
               pageNumber={i}
@@ -294,6 +295,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ fileUrl, fileName }) => {
               signatureData={signatureData}
               initialsData={initialsData}
               activeStamp={activeStamp}
+              readonly={readonly}
             />
         </div>
       );
@@ -341,6 +343,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ fileUrl, fileName }) => {
         onInitialsClick={() => setShowSignatureModal('INITIALS')}
         activeStamp={activeStamp}
         setActiveStamp={setActiveStamp}
+        readonly={readonly}
       />
       <div ref={viewerRef} className="flex-grow overflow-auto bg-gray-800 p-4">
         <div id="pdf-print-area" className="mx-auto">
