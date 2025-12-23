@@ -1,0 +1,5 @@
+
+{
+  "name": "React PDF Annotator",
+  "description": "An enterprise-grade PDF viewer and annotation tool built with React, TypeScript, and Tailwind CSS. Allows users to upload, view, draw on, print, and download PDFs with their annotations."
+}

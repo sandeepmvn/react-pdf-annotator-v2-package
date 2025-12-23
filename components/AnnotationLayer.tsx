@@ -1,0 +1,361 @@
+
+import React, { useState, useRef, MouseEvent as ReactMouseEvent } from 'react';
+import { Annotation, AnnotationTool, Point } from '../types';
+
+type InteractionMode = 'none' | 'drawing' | 'moving' | 'resizing';
+type ResizeHandle = 'tl' | 'tr' | 'bl' | 'br' | 't' | 'r' | 'b' | 'l';
+
+interface AnnotationLayerProps {
+  width: number;
+  height: number;
+  zoom: number;
+  activeTool: AnnotationTool;
+  toolColor: string;
+  strokeWidth: number;
+  fontSize: number;
+  addAnnotation: (annotation: Omit<Annotation, 'id' | 'page'>) => void;
+  annotations: Annotation[];
+  deleteAnnotation: (annotationId: string) => void;
+  updateAnnotation: (annotation: Annotation) => void;
+  selectedAnnotationId: string | null;
+  setSelectedAnnotationId: (id: string | null) => void;
+  signatureData: string | null;
+  initialsData: string | null;
+  activeStamp: string;
+}
+
+const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
+  const {
+    width, height, zoom, activeTool, toolColor, strokeWidth, fontSize,
+    addAnnotation, annotations, deleteAnnotation, updateAnnotation,
+    selectedAnnotationId, setSelectedAnnotationId,
+    signatureData, initialsData, activeStamp
+  } = props;
+
+  const [interaction, setInteraction] = useState<{
+    mode: InteractionMode;
+    handle?: ResizeHandle;
+    startPos: Point;
+    originalAnnotation?: Annotation;
+  }>({ mode: 'none', startPos: {x: 0, y: 0} });
+  
+  const [tempAnnotation, setTempAnnotation] = useState<Annotation | null>(null);
+  const textInputRef = useRef<HTMLTextAreaElement>(null);
+  const [isTexting, setIsTexting] = useState<Point | null>(null);
+
+  const getMousePos = (e: ReactMouseEvent): Point => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) / zoom,
+      y: (e.clientY - rect.top) / zoom,
+    };
+  };
+
+  const handleMouseDown = (e: ReactMouseEvent) => {
+    const pos = getMousePos(e);
+
+    if (activeTool === 'SELECT') {
+        const selectedAnn = annotations.find(ann => ann.id === selectedAnnotationId);
+        if (selectedAnn) {
+            const box = getAnnotationBoundingBox(selectedAnn);
+            if (box) {
+                const handles = getResizeHandles(box);
+                for (const handleKey in handles) {
+                    const handlePos = handles[handleKey as ResizeHandle];
+                    const handleSize = 8 / zoom;
+                    if (pos.x >= handlePos.x - handleSize / 2 && pos.x <= handlePos.x + handleSize / 2 &&
+                        pos.y >= handlePos.y - handleSize / 2 && pos.y <= handlePos.y + handleSize / 2) {
+                        
+                        setInteraction({ mode: 'resizing', handle: handleKey as ResizeHandle, startPos: pos, originalAnnotation: selectedAnn });
+                        return;
+                    }
+                }
+            }
+            if (isPointInAnnotation(pos, selectedAnn, zoom)) {
+                setInteraction({ mode: 'moving', startPos: pos, originalAnnotation: selectedAnn });
+                return;
+            }
+        }
+        
+        const clickedAnn = annotations.slice().reverse().find(ann => isPointInAnnotation(pos, ann, zoom));
+        setSelectedAnnotationId(clickedAnn ? clickedAnn.id : null);
+        if (clickedAnn) {
+             setInteraction({ mode: 'moving', startPos: pos, originalAnnotation: clickedAnn });
+        }
+        return;
+    }
+
+    if (['TEXT', 'STAMP', 'SIGNATURE', 'INITIALS'].includes(activeTool)) return;
+
+    setInteraction({ mode: 'drawing', startPos: pos });
+    if (['PEN', 'HIGHLIGHTER', 'ERASER', 'UNDERLINE', 'STRIKETHROUGH', 'SQUIGGLY'].includes(activeTool)) {
+      setTempAnnotation({ type: activeTool, points: [pos], color: toolColor, strokeWidth, id: 'temp', page: 0 } as any);
+    }
+  };
+
+  const handleMouseMove = (e: ReactMouseEvent) => {
+    const currentPos = getMousePos(e);
+    
+    if (interaction.mode === 'moving' && interaction.originalAnnotation) {
+        const dx = currentPos.x - interaction.startPos.x;
+        const dy = currentPos.y - interaction.startPos.y;
+        setTempAnnotation(moveAnnotation(interaction.originalAnnotation, dx, dy));
+    } else if (interaction.mode === 'resizing' && interaction.originalAnnotation && interaction.handle) {
+        const dx = currentPos.x - interaction.startPos.x;
+        const dy = currentPos.y - interaction.startPos.y;
+        setTempAnnotation(resizeAnnotation(interaction.originalAnnotation, interaction.handle, dx, dy));
+    } else if (interaction.mode === 'drawing') {
+        const { startPos } = interaction;
+        let newAnn: Annotation | null = null;
+        switch (activeTool) {
+            case 'PEN':
+            case 'HIGHLIGHTER':
+            case 'UNDERLINE':
+            case 'STRIKETHROUGH':
+            case 'SQUIGGLY':
+                newAnn = { ...tempAnnotation!, points: [...(tempAnnotation as any).points, currentPos] } as any;
+                break;
+            case 'RECTANGLE':
+                newAnn = { type: 'RECTANGLE', x: Math.min(startPos.x, currentPos.x), y: Math.min(startPos.y, currentPos.y), width: Math.abs(startPos.x - currentPos.x), height: Math.abs(startPos.y - currentPos.y), color: toolColor, strokeWidth, id: 'temp', page: 0 };
+                break;
+            case 'CIRCLE':
+                newAnn = { type: 'CIRCLE', cx: (startPos.x + currentPos.x) / 2, cy: (startPos.y + currentPos.y) / 2, rx: Math.abs(startPos.x - currentPos.x) / 2, ry: Math.abs(startPos.y - currentPos.y) / 2, color: toolColor, strokeWidth, id: 'temp', page: 0 };
+                break;
+        }
+        if (newAnn) setTempAnnotation(newAnn);
+    }
+  };
+
+  const handleMouseUp = () => {
+    if (interaction.mode === 'moving' || interaction.mode === 'resizing') {
+        if (tempAnnotation) {
+            updateAnnotation(tempAnnotation);
+        }
+    } else if (interaction.mode === 'drawing' && tempAnnotation) {
+        const { id, page, ...rest } = tempAnnotation;
+        addAnnotation(rest as any);
+    }
+    
+    setInteraction({ mode: 'none', startPos: {x:0, y:0} });
+    setTempAnnotation(null);
+  };
+
+  const handleSvgClick = (e: ReactMouseEvent) => {
+    if (interaction.mode !== 'none') return;
+    const pos = getMousePos(e);
+    
+    if (activeTool === 'TEXT') {
+      setIsTexting(pos);
+      setTimeout(() => textInputRef.current?.focus(), 0);
+    }
+    if (activeTool === 'STAMP') {
+        addAnnotation({ type: 'STAMP', x: pos.x - 60, y: pos.y - 20, width: 120, height: 40, text: activeStamp, fontSize: 24, color: toolColor, strokeWidth: 2 } as any);
+    }
+    if (activeTool === 'SIGNATURE' && signatureData) {
+        addAnnotation({ type: 'SIGNATURE', x: pos.x - 75, y: pos.y - 37.5, width: 150, height: 75, imageData: signatureData, color: toolColor, strokeWidth: 0 } as any);
+    }
+    if (activeTool === 'INITIALS' && initialsData) {
+        addAnnotation({ type: 'INITIALS', x: pos.x - 40, y: pos.y - 20, width: 80, height: 40, imageData: initialsData, color: toolColor, strokeWidth: 0 } as any);
+    }
+  };
+
+  const handleTextBlur = () => {
+    if (!isTexting || !textInputRef.current) return;
+    const content = textInputRef.current.value.trim();
+    if (content) {
+      addAnnotation({
+        type: 'TEXT',
+        x: isTexting.x,
+        y: isTexting.y,
+        width: textInputRef.current.offsetWidth / zoom,
+        content,
+        fontSize: fontSize,
+        color: toolColor,
+        strokeWidth: 1,
+      } as any);
+    }
+    setIsTexting(null);
+  };
+
+  const annotationsToRender = tempAnnotation 
+    ? annotations.map(ann => ann.id === tempAnnotation.id ? tempAnnotation : ann)
+    : annotations;
+  if (interaction.mode === 'drawing' && tempAnnotation && !annotations.find(a => a.id === tempAnnotation.id)) {
+      annotationsToRender.push(tempAnnotation);
+  }
+
+  return (
+    <div className="absolute top-0 left-0" style={{ cursor: getCursor(activeTool, selectedAnnotationId, getMousePos, annotations, zoom) }}>
+      <svg width={width} height={height} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onClick={handleSvgClick}>
+        {annotationsToRender.map(ann => renderAnnotation(ann, selectedAnnotationId, zoom))}
+      </svg>
+      {isTexting && (
+        <textarea
+          ref={textInputRef}
+          onBlur={handleTextBlur}
+          style={{
+            position: 'absolute',
+            left: isTexting.x * zoom,
+            top: isTexting.y * zoom,
+            border: `1px dashed ${toolColor}`,
+            color: toolColor,
+            background: 'rgba(255,255,255,0.9)',
+            fontSize: `${fontSize}px`,
+            lineHeight: 1.2,
+            width: 'auto',
+            minWidth: '150px',
+            height: 'auto',
+            minHeight: `${fontSize * 1.5}px`,
+            resize: 'horizontal',
+            outline: 'none',
+            overflow: 'hidden',
+            zIndex: 100,
+            fontFamily: 'sans-serif',
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+// --- Helper Functions ---
+
+function renderAnnotation(ann: Annotation, selectedId: string | null, zoom: number) {
+    const isSelected = ann.id === selectedId;
+    const baseProps = { stroke: ann.color, strokeWidth: ann.strokeWidth };
+    let element = null;
+
+    switch (ann.type) {
+        case 'PEN':
+        case 'UNDERLINE':
+        case 'STRIKETHROUGH':
+        case 'SQUIGGLY':
+            const points = ann.points.map(p => `${p.x * zoom},${p.y * zoom}`).join(' ');
+            element = <polyline points={points} fill="none" {...baseProps} />;
+            break;
+        case 'HIGHLIGHTER':
+            const hlPoints = ann.points.map(p => `${p.x * zoom},${p.y * zoom}`).join(' ');
+            element = <polyline points={hlPoints} fill="none" {...baseProps} strokeOpacity={0.3} strokeWidth={ann.strokeWidth * 5} strokeLinecap="round" />;
+            break;
+        case 'RECTANGLE':
+            element = <rect x={ann.x * zoom} y={ann.y * zoom} width={ann.width * zoom} height={ann.height * zoom} fill="none" {...baseProps} />;
+            break;
+        case 'CIRCLE':
+            element = <ellipse cx={ann.cx * zoom} cy={ann.cy * zoom} rx={ann.rx * zoom} ry={ann.ry * zoom} fill="none" {...baseProps} />;
+            break;
+        case 'TEXT':
+            element = <text x={ann.x * zoom} y={ann.y * zoom + ann.fontSize * zoom} fill={ann.color} fontSize={ann.fontSize * zoom} style={{ whiteSpace: 'pre-wrap' }}>{ann.content}</text>;
+            break;
+        case 'STAMP':
+            element = <g>
+                <rect x={ann.x * zoom} y={ann.y * zoom} width={ann.width * zoom} height={ann.height * zoom} fill="none" stroke={ann.color} strokeWidth="2" opacity="0.8" />
+                <text x={(ann.x + ann.width/2) * zoom} y={(ann.y + ann.height/2 + ann.fontSize/3) * zoom} fill={ann.color} fontSize={ann.fontSize * zoom} textAnchor="middle" alignmentBaseline="middle" fontWeight="bold" opacity="0.8">{ann.text}</text>
+            </g>;
+            break;
+        case 'SIGNATURE':
+        case 'INITIALS':
+            element = <image href={ann.imageData} x={ann.x * zoom} y={ann.y * zoom} width={ann.width * zoom} height={ann.height * zoom} />;
+            break;
+    }
+
+    const box = getAnnotationBoundingBox(ann);
+    return <g key={ann.id}>{element}{isSelected && box && renderSelectionBox(box, zoom)}</g>;
+}
+
+function getAnnotationBoundingBox(ann: Annotation): { minX: number; minY: number; maxX: number; maxY: number } | null {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    switch (ann.type) {
+        case 'RECTANGLE': case 'STAMP': case 'SIGNATURE': case 'INITIALS':
+            return { minX: ann.x, minY: ann.y, maxX: ann.x + ann.width, maxY: ann.y + ann.height };
+        case 'TEXT':
+            return { minX: ann.x, minY: ann.y, maxX: ann.x + ann.width, maxY: ann.y + ann.fontSize };
+        case 'CIRCLE':
+            return { minX: ann.cx - ann.rx, minY: ann.cy - ann.ry, maxX: ann.cx + ann.rx, maxY: ann.cy + ann.ry };
+        case 'PEN': case 'HIGHLIGHTER': case 'UNDERLINE': case 'STRIKETHROUGH': case 'SQUIGGLY':
+            ann.points.forEach(p => {
+                minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+                maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+            });
+            return { minX, minY, maxX, maxY };
+    }
+    return null;
+}
+
+function renderSelectionBox(box: { minX: number; minY: number; maxX: number; maxY: number }, zoom: number) {
+    const padding = 4 / zoom;
+    const rectProps = {
+        x: (box.minX - padding) * zoom,
+        y: (box.minY - padding) * zoom,
+        width: (box.maxX - box.minX + padding * 2) * zoom,
+        height: (box.maxY - box.minY + padding * 2) * zoom,
+    };
+    const handles = getResizeHandles(box);
+    const handleSize = 8;
+
+    return (
+        <g>
+            <rect {...rectProps} fill="none" stroke="#3b82f6" strokeWidth="1" strokeDasharray="3 3" />
+            {Object.values(handles).map((p, i) => (
+                <rect key={i} x={p.x * zoom - handleSize/2} y={p.y * zoom - handleSize/2} width={handleSize} height={handleSize} fill="#fff" stroke="#3b82f6" strokeWidth="1" />
+            ))}
+        </g>
+    );
+}
+
+function getResizeHandles(box: { minX: number; minY: number; maxX: number; maxY: number }): Record<ResizeHandle, Point> {
+    return {
+        tl: { x: box.minX, y: box.minY },
+        t: { x: (box.minX + box.maxX) / 2, y: box.minY },
+        tr: { x: box.maxX, y: box.minY },
+        l: { x: box.minX, y: (box.minY + box.maxY) / 2 },
+        r: { x: box.maxX, y: (box.minY + box.maxY) / 2 },
+        bl: { x: box.minX, y: box.maxY },
+        b: { x: (box.minX + box.maxX) / 2, y: box.maxY },
+        br: { x: box.maxX, y: box.maxY },
+    };
+}
+
+function isPointInAnnotation(point: Point, ann: Annotation, zoom: number): boolean {
+    const box = getAnnotationBoundingBox(ann);
+    if (!box) return false;
+    const padding = 5 / zoom;
+    return point.x >= box.minX - padding && point.x <= box.maxX + padding &&
+           point.y >= box.minY - padding && point.y <= box.maxY + padding;
+}
+
+function moveAnnotation<T extends Annotation>(ann: T, dx: number, dy: number): T {
+    const newAnn = JSON.parse(JSON.stringify(ann));
+    switch (newAnn.type) {
+        case 'RECTANGLE': case 'TEXT': case 'STAMP': case 'SIGNATURE': case 'INITIALS':
+            newAnn.x += dx; newAnn.y += dy; break;
+        case 'CIRCLE':
+            newAnn.cx += dx; newAnn.cy += dy; break;
+        case 'PEN': case 'HIGHLIGHTER': case 'UNDERLINE': case 'STRIKETHROUGH': case 'SQUIGGLY':
+            newAnn.points = newAnn.points.map((p: Point) => ({ x: p.x + dx, y: p.y + dy })); break;
+    }
+    return newAnn;
+}
+
+function resizeAnnotation<T extends Annotation>(ann: T, handle: ResizeHandle, dx: number, dy: number): T {
+    const newAnn = JSON.parse(JSON.stringify(ann));
+    // This is a simplified resize logic. A full implementation would be more complex.
+    if (newAnn.type === 'RECTANGLE' || newAnn.type === 'SIGNATURE' || newAnn.type === 'INITIALS' || newAnn.type === 'STAMP') {
+        if (handle.includes('l')) { newAnn.x += dx; newAnn.width -= dx; }
+        if (handle.includes('r')) { newAnn.width += dx; }
+        if (handle.includes('t')) { newAnn.y += dy; newAnn.height -= dy; }
+        if (handle.includes('b')) { newAnn.height += dy; }
+        if (newAnn.width < 0) { newAnn.x += newAnn.width; newAnn.width *= -1; }
+        if (newAnn.height < 0) { newAnn.y += newAnn.height; newAnn.height *= -1; }
+    }
+    return newAnn;
+}
+
+function getCursor(activeTool: AnnotationTool, selectedId: string | null, getMousePos: (e: any) => Point, annotations: Annotation[], zoom: number): string {
+    // This is a placeholder for a more complex cursor logic based on hover state
+    if (activeTool === 'SELECT') return selectedId ? 'move' : 'default';
+    if (['PEN', 'RECTANGLE', 'CIRCLE', 'HIGHLIGHTER', 'UNDERLINE', 'STRIKETHROUGH', 'SQUIGGLY'].includes(activeTool)) return 'crosshair';
+    if (activeTool === 'TEXT') return 'text';
+    return 'default';
+}
+
+export default AnnotationLayer;

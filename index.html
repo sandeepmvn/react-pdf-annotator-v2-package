@@ -1,0 +1,70 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>React PDF Annotator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @media print {
+        body * {
+          visibility: hidden;
+        }
+        .pdf-print-area, .pdf-print-area * {
+          visibility: visible;
+        }
+        .pdf-print-area {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+        }
+        .print-page {
+          page-break-after: always;
+          width: 100%;
+          height: auto;
+        }
+      }
+      /* Custom scrollbar for a more polished look */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #2d3748; /* bg-gray-800 */
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #4a5568; /* bg-gray-600 */
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #718096; /* bg-gray-500 */
+      }
+    </style>
+  </head>
+  <body class="bg-gray-800 text-white antialiased">
+    <div id="root"></div>
+
+    <!-- PDF.js from Mozilla CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+      // This global must be configured before the viewer component loads.
+      if (window.pdfjsLib) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+    </script>
+
+    <!-- Import Map for ES Modules -->
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "https://esm.sh/react@18.2.0",
+          "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+          "pdf-lib": "https://esm.sh/pdf-lib@1.17.1"
+        }
+      }
+    </script>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

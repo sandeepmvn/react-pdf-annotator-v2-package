@@ -1,0 +1,33 @@
+# Source files
+src/
+components/
+hooks/
+lib/
+*.tsx
+*.ts
+!dist/**/*.d.ts
+
+# Config files
+vite.config.ts
+tsconfig.json
+tsconfig.node.json
+postcss.config.js
+tailwind.config.js
+.eslintrc.*
+
+# Development files
+node_modules/
+.vscode/
+.git/
+.gitignore
+*.log
+
+# Demo/Example files
+App.tsx
+index.tsx
+index.html
+index.css
+
+# Build artifacts (except dist/)
+.cache/
+coverage/
