@@ -307,9 +307,12 @@ function renderSelectionBox(box: { minX: number; minY: number; maxX: number; max
 
     return (
         <g>
-            <rect {...rectProps} fill="none" stroke="#3b82f6" strokeWidth="1" strokeDasharray="3 3" />
+            {/* White outline for better visibility */}
+            <rect {...rectProps} fill="none" stroke="#ffffff" strokeWidth="3" strokeDasharray="5 5" />
+            {/* Blue main border */}
+            <rect {...rectProps} fill="none" stroke="#0ea5e9" strokeWidth="2" strokeDasharray="5 5" />
             {Object.values(handles).map((p, i) => (
-                <rect key={i} x={p.x * zoom - handleSize/2} y={p.y * zoom - handleSize/2} width={handleSize} height={handleSize} fill="#fff" stroke="#3b82f6" strokeWidth="1" />
+                <rect key={i} x={p.x * zoom - handleSize/2} y={p.y * zoom - handleSize/2} width={handleSize} height={handleSize} fill="#0ea5e9" stroke="#ffffff" strokeWidth="2" />
             ))}
         </g>
     );
