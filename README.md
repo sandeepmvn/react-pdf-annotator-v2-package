@@ -66,6 +66,88 @@ To display a PDF without annotation tools (view-only mode):
 />
 ```
 
+### Tracking Annotation Changes
+
+To receive real-time updates when annotations are added, modified, or deleted:
+
+```tsx
+import { Annotations } from 'react-pdf-annotator-v2';
+
+function App() {
+  const handleAnnotationsChange = (annotations: Annotations) => {
+    console.log('Annotations updated:', annotations);
+    // Save to database, update state, etc.
+  };
+
+  return (
+    <PdfViewer 
+      fileUrl="https://example.com/sample.pdf" 
+      fileName="sample.pdf" 
+      onAnnotationsChange={handleAnnotationsChange}
+    />
+  );
+}
+```
+
+The `annotations` parameter is an object where keys are page numbers and values are arrays of annotations:
+
+```typescript
+{
+  1: [{ id: '...', type: 'PEN', points: [...], color: '#000000', ... }],
+  2: [{ id: '...', type: 'TEXT', content: 'Hello', x: 100, y: 200, ... }],
+  // ...
+}
+```
+
+### Getting Annotated Document
+
+Use refs to programmatically get the current annotated PDF as a Blob or URL:
+
+```tsx
+import { useRef } from 'react';
+import { PdfViewer, PdfViewerRef } from 'react-pdf-annotator-v2';
+
+function App() {
+  const pdfViewerRef = useRef<PdfViewerRef>(null);
+
+  const handleSave = async () => {
+    if (!pdfViewerRef.current) return;
+    
+    // Get as Blob
+    const blob = await pdfViewerRef.current.getAnnotatedDocument();
+    if (blob) {
+      // Upload to server
+      const formData = new FormData();
+      formData.append('file', blob, 'annotated.pdf');
+      await fetch('/api/upload', { method: 'POST', body: formData });
+    }
+  };
+
+  const handlePreview = async () => {
+    if (!pdfViewerRef.current) return;
+    
+    // Get as URL for preview
+    const url = await pdfViewerRef.current.getAnnotatedDocumentUrl();
+    if (url) {
+      window.open(url, '_blank');
+      // Remember to revoke URL when done: URL.revokeObjectURL(url)
+    }
+  };
+
+  return (
+    <>
+      <button onClick={handleSave}>Save to Server</button>
+      <button onClick={handlePreview}>Preview</button>
+      <PdfViewer 
+        ref={pdfViewerRef}
+        fileUrl="https://example.com/sample.pdf" 
+        fileName="sample.pdf" 
+      />
+    </>
+  );
+}
+```
+
 ## 📖 API Reference
 
 ### PdfViewer Props
@@ -75,12 +157,24 @@ To display a PDF without annotation tools (view-only mode):
 | `fileUrl` | `string` | Yes | - | URL of the PDF file to display |
 | `fileName` | `string` | Yes | - | Name of the PDF file (used for downloads) |
 | `readonly` | `boolean` | No | `false` | Hide annotation tools and prevent editing |
+| `onAnnotationsChange` | `(annotations: Annotations) => void` | No | - | Callback fired when annotations change (add/update/delete/undo/redo) |
+| `ref` | `React.Ref<PdfViewerRef>` | No | - | Ref to access component methods |
+
+### PdfViewerRef Methods
+
+When using a ref, the following methods are available:
+
+| Method | Return Type | Description |
+|--------|-------------|-------------|
+| `getAnnotatedDocument()` | `Promise<Blob \| null>` | Returns the current PDF with annotations as a Blob |
+| `getAnnotatedDocumentUrl()` | `Promise<string \| null>` | Returns an object URL of the annotated PDF (remember to revoke when done) |
 
 ### Available Exports
 
 ```tsx
-// Main Component
+// Main Component and Types
 import { PdfViewer } from 'react-pdf-annotator-v2';
+import type { PdfViewerRef } from 'react-pdf-annotator-v2';
 
 // Sub-components (for custom layouts)
 import { 

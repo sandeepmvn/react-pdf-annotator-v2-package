@@ -3,6 +3,7 @@ import '../index.css';
 
 // Main component
 export { default as PdfViewer } from '../components/PdfViewer';
+export type { PdfViewerRef } from '../components/PdfViewer';
 
 // Sub-components (if users want to build custom layouts)
 export { default as PdfPage } from '../components/PdfPage';

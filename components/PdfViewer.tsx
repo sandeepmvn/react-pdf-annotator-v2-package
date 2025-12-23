@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist/types/src/display/api';
 import Toolbar from './Toolbar';
 import PdfPage from './PdfPage';
@@ -12,13 +12,19 @@ import { DEFAULT_COLOR, DEFAULT_FONT_SIZE, DEFAULT_STROKE_WIDTH } from '../const
 // Fix: Declare pdfjsLib as a global variable to satisfy TypeScript when using the CDN version.
 declare const pdfjsLib: any;
 
+export interface PdfViewerRef {
+  getAnnotatedDocument: () => Promise<Blob | null>;
+  getAnnotatedDocumentUrl: () => Promise<string | null>;
+}
+
 interface PdfViewerProps {
   fileUrl: string;
   fileName: string;
   readonly?: boolean;
+  onAnnotationsChange?: (annotations: Record<number, Annotation[]>) => void;
 }
 
-const PdfViewer: React.FC<PdfViewerProps> = ({ fileUrl, fileName, readonly = false }) => {
+const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName, readonly = false, onAnnotationsChange }, ref) => {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -37,6 +43,13 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ fileUrl, fileName, readonly = fal
   const { annotations, addAnnotation, deleteAnnotation, updateAnnotation, clearAnnotations, undo, redo, canUndo, canRedo } = useAnnotationHistory();
   const viewerRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // Notify parent component whenever annotations change
+  useEffect(() => {
+    if (onAnnotationsChange) {
+      onAnnotationsChange(annotations);
+    }
+  }, [annotations, onAnnotationsChange]);
 
   useEffect(() => {
     const loadPdf = async () => {
@@ -220,6 +233,31 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ fileUrl, fileName, readonly = fal
     return await pdfDoc.save();
   }, [pdf, fileUrl, annotations]);
 
+  // Expose methods to parent component via ref
+  useImperativeHandle(ref, () => ({
+    getAnnotatedDocument: async () => {
+      try {
+        const pdfBytes = await generateAnnotatedPdf();
+        if (!pdfBytes) return null;
+        return new Blob([pdfBytes as any], { type: 'application/pdf' });
+      } catch (error) {
+        console.error('Failed to generate annotated document:', error);
+        return null;
+      }
+    },
+    getAnnotatedDocumentUrl: async () => {
+      try {
+        const pdfBytes = await generateAnnotatedPdf();
+        if (!pdfBytes) return null;
+        const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
+        return URL.createObjectURL(blob);
+      } catch (error) {
+        console.error('Failed to generate annotated document URL:', error);
+        return null;
+      }
+    }
+  }), [generateAnnotatedPdf]);
+
   const handleAction = useCallback(async (action: 'download' | 'print') => {
     setIsProcessing(true);
     try {
@@ -352,6 +390,8 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ fileUrl, fileName, readonly = fal
       </div>
     </div>
   );
-};
+});
+
+PdfViewer.displayName = 'PdfViewer';
 
 export default PdfViewer;

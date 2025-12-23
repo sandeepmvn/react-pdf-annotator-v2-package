@@ -1,7 +1,9 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import PdfViewer from './components/PdfViewer';
+import type { PdfViewerRef } from './components/PdfViewer';
 import { UploadIcon } from './components/Icons';
+import type { Annotations } from './types';
 
 // A sample PDF file URL for demonstration purposes.
 // You can replace this with any publicly accessible PDF URL.
@@ -10,6 +12,35 @@ const SAMPLE_PDF_URL = 'https://mozilla.github.io/pdf.js/web/compressed.tracemon
 const App: React.FC = () => {
   const [pdfFile, setPdfFile] = useState<string | null>(SAMPLE_PDF_URL);
   const [fileName, setFileName] = useState<string>('sample.pdf');
+  const [annotationsCount, setAnnotationsCount] = useState<number>(0);
+  const pdfViewerRef = useRef<PdfViewerRef>(null);
+
+  const handleAnnotationsChange = useCallback((annotations: Annotations) => {
+    // Count total annotations across all pages
+    const total = Object.values(annotations).reduce(
+      (sum, pageAnnotations) => sum + pageAnnotations.length,
+      0
+    );
+    setAnnotationsCount(total);
+    
+    // Here you can save to localStorage, send to backend, etc.
+    console.log('Annotations changed:', annotations);
+  }, []);
+
+  const handleGetAnnotatedPdf = async () => {
+    if (!pdfViewerRef.current) return;
+    
+    const blob = await pdfViewerRef.current.getAnnotatedDocument();
+    if (blob) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `annotated-${fileName}`;
+      a.click();
+      URL.revokeObjectURL(url);
+      alert('Annotated PDF downloaded!');
+    }
+  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -29,7 +60,28 @@ const App: React.FC = () => {
   return (
     <div className="flex flex-col h-screen bg-gray-900 text-gray-200 font-sans">
       {pdfFile ? (
-        <PdfViewer key={pdfFile} fileUrl={pdfFile} fileName={fileName} />
+        <>
+          {annotationsCount > 0 && (
+            <div className="bg-indigo-600 px-4 py-2 flex items-center justify-between">
+              <span className="text-sm font-medium">
+                📝 {annotationsCount} annotation{annotationsCount !== 1 ? 's' : ''} added
+              </span>
+              <button
+                onClick={handleGetAnnotatedPdf}
+                className="bg-white text-indigo-600 px-3 py-1 rounded text-sm font-semibold hover:bg-gray-100 transition-colors"
+              >
+                Get Annotated PDF
+              </button>
+            </div>
+          )}
+          <PdfViewer 
+            ref={pdfViewerRef}
+            key={pdfFile} 
+            fileUrl={pdfFile} 
+            fileName={fileName}
+            onAnnotationsChange={handleAnnotationsChange}
+          />
+        </>
       ) : (
         <div className="flex flex-col items-center justify-center h-full">
           <div className="text-center p-8 border-2 border-dashed border-gray-600 rounded-xl bg-gray-800 shadow-2xl">

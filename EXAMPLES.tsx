@@ -151,6 +151,181 @@ function MultipleDocumentsExample() {
   );
 }
 
+/**
+ * Example: With Annotations Change Tracking
+ * 
+ * Track and persist annotation changes in real-time.
+ */
+function AnnotationTrackingExample() {
+  const [annotationsCount, setAnnotationsCount] = React.useState(0);
+  const [lastChange, setLastChange] = React.useState<string>('No changes yet');
+
+  const handleAnnotationsChange = (annotations: Record<number, any[]>) => {
+    // Count total annotations across all pages
+    const total = Object.values(annotations).reduce(
+      (sum, pageAnnotations) => sum + pageAnnotations.length, 
+      0
+    );
+    setAnnotationsCount(total);
+    setLastChange(new Date().toLocaleTimeString());
+    
+    // Here you could save to localStorage, database, etc.
+    // localStorage.setItem('annotations', JSON.stringify(annotations));
+    console.log('Annotations updated:', annotations);
+  };
+
+  return (
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ 
+        padding: '1rem', 
+        background: '#2d2d2d',
+        color: 'white',
+        display: 'flex',
+        gap: '2rem'
+      }}>
+        <div>Total Annotations: <strong>{annotationsCount}</strong></div>
+        <div>Last Change: <strong>{lastChange}</strong></div>
+      </div>
+      
+      <div style={{ flex: 1 }}>
+        <PdfViewer 
+          fileUrl="https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf"
+          fileName="tracked-document.pdf"
+          onAnnotationsChange={handleAnnotationsChange}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Example: Getting Annotated Document Programmatically
+ * 
+ * Use refs to access the annotated PDF document programmatically.
+ */
+function GetAnnotatedDocumentExample() {
+  const pdfViewerRef = React.useRef<any>(null);
+  const [status, setStatus] = React.useState<string>('');
+
+  const handleSaveToServer = async () => {
+    if (!pdfViewerRef.current) return;
+    
+    setStatus('Generating annotated PDF...');
+    const blob = await pdfViewerRef.current.getAnnotatedDocument();
+    
+    if (blob) {
+      // Simulate server upload
+      setStatus(`PDF ready! Size: ${(blob.size / 1024).toFixed(2)} KB`);
+      
+      // In real app, you would upload to server:
+      // const formData = new FormData();
+      // formData.append('file', blob, 'annotated.pdf');
+      // await fetch('/api/upload', { method: 'POST', body: formData });
+      
+      // For demo, just download it
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'annotated-document.pdf';
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      setStatus('Failed to generate PDF');
+    }
+  };
+
+  const handlePreview = async () => {
+    if (!pdfViewerRef.current) return;
+    
+    setStatus('Opening preview...');
+    const url = await pdfViewerRef.current.getAnnotatedDocumentUrl();
+    
+    if (url) {
+      window.open(url, '_blank');
+      setStatus('Preview opened in new tab');
+      // Note: In production, remember to revoke URL after use
+      // setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } else {
+      setStatus('Failed to generate preview');
+    }
+  };
+
+  return (
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ 
+        padding: '1rem', 
+        background: '#2d2d2d',
+        color: 'white',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <button 
+            onClick={handleSaveToServer}
+            style={{
+              padding: '0.5rem 1rem',
+              background: '#4CAF50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Save to Server
+          </button>
+          <button 
+            onClick={handlePreview}
+            style={{
+              padding: '0.5rem 1rem',
+              background: '#2196F3',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Preview in New Tab
+          </button>
+        </div>
+        {status && <span style={{ fontSize: '0.875rem' }}>{status}</span>}
+      </div>
+      
+      <div style={{ flex: 1 }}>
+        <PdfViewer 
+          ref={pdfViewerRef}
+          fileUrl="https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf"
+          fileName="document.pdf"
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Example: Read-only Mode
+ * 
+ * Display a PDF without annotation tools (view-only).
+ */
+function ReadOnlyExample() {
+  return (
+    <div style={{ height: '100vh' }}>
+      <PdfViewer 
+        fileUrl="https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf"
+        fileName="readonly-document.pdf"
+        readonly={true}
+      />
+    </div>
+  );
+}
+
 export default BasicExample;
 // Export other examples too
-export { FileUploadExample, CustomWrapperExample, MultipleDocumentsExample };
+export { 
+  FileUploadExample, 
+  CustomWrapperExample, 
+  MultipleDocumentsExample,
+  AnnotationTrackingExample,
+  GetAnnotatedDocumentExample,
+  ReadOnlyExample
+};
