@@ -73,6 +73,7 @@ export interface StampAnnotation extends BaseAnnotation {
   height: number;
   text: string;
   fontSize: number;
+  timestamp?: string;
 }
 
 export interface ImageAnnotation extends BaseAnnotation {

@@ -146,7 +146,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
                 case 'STRIKETHROUGH':
                     if (annotation.points.length > 1) {
                         const path = annotation.points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x * scaleX} ${y(p.y)}`).join(' ');
-                        pdfLibPage.drawSvgPath(path, { borderColor: color, borderWidth: annotation.strokeWidth });
+                        pdfLibPage.drawSvgPath(path, { borderColor: color, borderWidth: annotation.strokeWidth, borderLineCap: LineCapStyle.Round });
                     }
                     break;
                 case 'SQUIGGLY':
@@ -163,7 +163,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
                 case 'HIGHLIGHTER':
                      if (annotation.points.length > 1) {
                         const path = annotation.points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x * scaleX} ${y(p.y)}`).join(' ');
-                        pdfLibPage.drawSvgPath(path, { borderColor: color, borderWidth: annotation.strokeWidth * 5, opacity: 0.3, borderLineCap: LineCapStyle.Round });
+                        pdfLibPage.drawSvgPath(path, { borderColor: color, borderWidth: annotation.strokeWidth * 5, opacity: 0.4, borderLineCap: LineCapStyle.Round, borderOpacity: 0.4 });
                     }
                     break;
                 case 'RECTANGLE':
@@ -205,14 +205,28 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
                         borderWidth: 2,
                         borderOpacity: 0.8,
                     });
-                    pdfLibPage.drawText(annotation.text, {
-                        x: (annotation.x + annotation.width / 2) * scaleX,
-                        y: y(annotation.y + annotation.height / 2 + annotation.fontSize / 3),
+                    const stampText = annotation.text;
+                    const textWidth = helveticaBoldFont.widthOfTextAtSize(stampText, annotation.fontSize * scaleY);
+                    pdfLibPage.drawText(stampText, {
+                        x: (annotation.x + annotation.width / 2) * scaleX - textWidth / 2,
+                        y: y(annotation.y + annotation.height * 0.35),
                         font: helveticaBoldFont,
                         size: annotation.fontSize * scaleY,
                         color,
                         opacity: 0.8,
                     });
+                    if (annotation.timestamp) {
+                        const timestampSize = annotation.fontSize * 0.45 * scaleY;
+                        const timestampWidth = helveticaFont.widthOfTextAtSize(annotation.timestamp, timestampSize);
+                        pdfLibPage.drawText(annotation.timestamp, {
+                            x: (annotation.x + annotation.width / 2) * scaleX - timestampWidth / 2,
+                            y: y(annotation.y + annotation.height * 0.7),
+                            font: helveticaFont,
+                            size: timestampSize,
+                            color,
+                            opacity: 0.7,
+                        });
+                    }
                     break;
                 case 'SIGNATURE':
                 case 'INITIALS':

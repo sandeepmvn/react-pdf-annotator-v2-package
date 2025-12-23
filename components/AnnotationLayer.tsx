@@ -158,7 +158,9 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
       setTimeout(() => textInputRef.current?.focus(), 0);
     }
     if (activeTool === 'STAMP') {
-        addAnnotation({ type: 'STAMP', x: pos.x - 60, y: pos.y - 20, width: 120, height: 40, text: activeStamp, fontSize: 24, color: toolColor, strokeWidth: 2 } as any);
+        const now = new Date();
+        const timestamp = now.toLocaleString();
+        addAnnotation({ type: 'STAMP', x: pos.x - 60, y: pos.y - 20, width: 120, height: 50, text: activeStamp, fontSize: 18, color: toolColor, strokeWidth: 2, timestamp } as any);
     }
     if (activeTool === 'SIGNATURE' && signatureData) {
         addAnnotation({ type: 'SIGNATURE', x: pos.x - 75, y: pos.y - 37.5, width: 150, height: 75, imageData: signatureData, color: toolColor, strokeWidth: 0 } as any);
@@ -259,7 +261,8 @@ function renderAnnotation(ann: Annotation, selectedId: string | null, zoom: numb
         case 'STAMP':
             element = <g>
                 <rect x={ann.x * zoom} y={ann.y * zoom} width={ann.width * zoom} height={ann.height * zoom} fill="none" stroke={ann.color} strokeWidth="2" opacity="0.8" />
-                <text x={(ann.x + ann.width/2) * zoom} y={(ann.y + ann.height/2 + ann.fontSize/3) * zoom} fill={ann.color} fontSize={ann.fontSize * zoom} textAnchor="middle" alignmentBaseline="middle" fontWeight="bold" opacity="0.8">{ann.text}</text>
+                <text x={(ann.x + ann.width/2) * zoom} y={(ann.y + ann.height * 0.35) * zoom} fill={ann.color} fontSize={ann.fontSize * zoom} textAnchor="middle" alignmentBaseline="middle" fontWeight="bold" opacity="0.8">{ann.text}</text>
+                {ann.timestamp && <text x={(ann.x + ann.width/2) * zoom} y={(ann.y + ann.height * 0.7) * zoom} fill={ann.color} fontSize={(ann.fontSize * 0.45) * zoom} textAnchor="middle" alignmentBaseline="middle" opacity="0.7">{ann.timestamp}</text>}
             </g>;
             break;
         case 'SIGNATURE':
