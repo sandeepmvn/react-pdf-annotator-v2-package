@@ -4,7 +4,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist/types/src/display/api';
 import Toolbar from './Toolbar';
 import PdfPage from './PdfPage';
 import SignatureModal from './modals/SignatureModal';
-import { useAnnotationHistory } from '../hooks/useAnnotationHistory';
+import { useAnnotationHistory,HistoryState } from '../hooks/useAnnotationHistory';
 import { AnnotationTool, Annotation } from '../types';
 import { PDFDocument, rgb, StandardFonts, LineCapStyle, PDFImage } from 'pdf-lib';
 import { DEFAULT_COLOR, DEFAULT_FONT_SIZE, DEFAULT_STROKE_WIDTH } from '../constants';
@@ -12,9 +12,15 @@ import { DEFAULT_COLOR, DEFAULT_FONT_SIZE, DEFAULT_STROKE_WIDTH } from '../const
 // Fix: Declare pdfjsLib as a global variable to satisfy TypeScript when using the CDN version.
 declare const pdfjsLib: any;
 
+export interface AnnotationExportData {
+  annotations: Record<number, Annotation[]>;
+  historyState: HistoryState;
+}
+
 export interface PdfViewerRef {
   getAnnotatedDocument: () => Promise<Blob | null>;
   getAnnotatedDocumentUrl: () => Promise<string | null>;
+  getAnnotationData: () => AnnotationExportData;
 }
 
 interface PdfViewerProps {
@@ -23,9 +29,32 @@ interface PdfViewerProps {
   readonly?: boolean;
   onAnnotationsChange?: (annotations: Record<number, Annotation[]>) => void;
   initialAnnotations?: Record<number, Annotation[]>;
+  initialHistoryState?: HistoryState;
+  onSave?: (data: AnnotationExportData) => void;
+  onPrint?: (data: AnnotationExportData) => void;
 }
+const ANNOTATION_METADATA_SUBJECT_PREFIX = 'PDF_ANNOTATOR_DATA::';
 
-const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName, readonly = false, onAnnotationsChange, initialAnnotations }, ref) => {
+// Helper to safely get annotation data, handling potential circular references
+const safeGetAnnotationData = (annotations: Record<number, Annotation[]>, historyState: HistoryState): AnnotationExportData => {
+  try {
+    // Try to stringify to check for issues
+    JSON.stringify(historyState);
+    return { annotations, historyState };
+  } catch (error) {
+    console.warn('Full history state has circular references or is too large, using current state only', error);
+    // Return simplified version with only current annotations
+    return {
+      annotations,
+      historyState: {
+        history: [annotations],
+        index: 0
+      }
+    };
+  }
+};
+
+const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName, readonly = false, onAnnotationsChange, initialAnnotations, initialHistoryState, onSave, onPrint }, ref) => {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -40,9 +69,8 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
   const [initialsData, setInitialsData] = useState<string | null>(null);
   const [showSignatureModal, setShowSignatureModal] = useState<'SIGNATURE' | 'INITIALS' | null>(null);
   const [activeStamp, setActiveStamp] = useState<string>('APPROVED');
-  const previousFileUrl = useRef<string>('');
 
-  const { annotations, addAnnotation, deleteAnnotation, updateAnnotation, clearAnnotations, undo, redo, canUndo, canRedo, setAnnotations } = useAnnotationHistory();
+  const { annotations, addAnnotation, deleteAnnotation, updateAnnotation, clearAnnotations, undo, redo, canUndo, canRedo, setAnnotations,historyState,setHistoryState } = useAnnotationHistory();
   const viewerRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -53,12 +81,16 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
     }
   }, [annotations, onAnnotationsChange]);
 
-  // Load initial annotations if provided
+  // Load initial annotations and history state if provided
   useEffect(() => {
-    if (initialAnnotations) {
+    if (initialHistoryState) {
+      // If full history state is provided, use it (takes priority)
+      setHistoryState(initialHistoryState);
+    } else if (initialAnnotations) {
+      // Otherwise just set annotations
       setAnnotations(initialAnnotations);
     }
-  }, [initialAnnotations, setAnnotations]);
+  }, [initialAnnotations, initialHistoryState, setAnnotations, setHistoryState]);
 
   useEffect(() => {
     const loadPdf = async () => {
@@ -70,19 +102,31 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         pageRefs.current = Array(pdfDocument.numPages).fill(null);
         setCurrentPage(1);
         
-        // Only clear annotations if we're loading a completely different file
-        // This allows annotations to persist when reloading the same file or an annotated version
-        if (previousFileUrl.current !== '' && previousFileUrl.current !== fileUrl) {
-          clearAnnotations();
+
+        // 2. Load PDF with pdf-lib to check for metadata (only if no initial data provided)
+        if (!initialHistoryState && !initialAnnotations) {
+          const pdfBytes = await fetch(fileUrl).then(res => res.arrayBuffer());
+          const pdfDocForMeta = await PDFDocument.load(pdfBytes);
+          const subject = pdfDocForMeta.getSubject();
+
+          if (subject && subject.startsWith(ANNOTATION_METADATA_SUBJECT_PREFIX)) {
+              try {
+                const jsonString = subject.substring(ANNOTATION_METADATA_SUBJECT_PREFIX.length);
+                const parsedState = JSON.parse(jsonString) as HistoryState;
+                setHistoryState(parsedState);
+              } catch (parseError) {
+                console.error('Failed to parse annotation metadata:', parseError);
+              }
+          }
         }
-        previousFileUrl.current = fileUrl;
+       
       } catch (error) {
         console.error('Error loading PDF:', error);
         alert('Failed to load PDF file.');
       }
     };
     loadPdf();
-  }, [fileUrl, clearAnnotations]);
+  }, [fileUrl, setHistoryState, initialHistoryState, initialAnnotations]);
 
   const handlePageChange = (page: number) => {
     if (page > 0 && page <= totalPages) {
@@ -124,9 +168,42 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
 
   const generateAnnotatedPdf = useCallback(async () => {
     if (!pdf) return null;
-    
+
     const existingPdfBytes = await fetch(fileUrl).then(res => res.arrayBuffer());
     const pdfDoc = await PDFDocument.load(existingPdfBytes);
+
+    // Embed the full annotation history state into the Subject metadata field
+    try {
+      const historyJson = JSON.stringify(historyState);
+      const metadataString = ANNOTATION_METADATA_SUBJECT_PREFIX + historyJson;
+
+      // PDF metadata fields have size limits - check if it's too large
+      if (metadataString.length > 32000) {
+        // Store only current annotations instead of full history
+        const currentStateOnly = {
+          history: [annotations],
+          index: 0
+        };
+        const simplifiedJson = JSON.stringify(currentStateOnly);
+        pdfDoc.setSubject(ANNOTATION_METADATA_SUBJECT_PREFIX + simplifiedJson);
+      } else {
+        pdfDoc.setSubject(metadataString);
+      }
+    } catch (error) {
+      console.error('Failed to serialize history state:', error);
+      // Fallback: just store current annotations
+      try {
+        const currentStateOnly = {
+          history: [annotations],
+          index: 0
+        };
+        const simplifiedJson = JSON.stringify(currentStateOnly);
+        pdfDoc.setSubject(ANNOTATION_METADATA_SUBJECT_PREFIX + simplifiedJson);
+      } catch (fallbackError) {
+        console.error('Failed to serialize even current annotations:', fallbackError);
+      }
+    }
+
     const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const helveticaBoldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const pdfLibPages = pdfDoc.getPages();
@@ -295,7 +372,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         }
     }
     return await pdfDoc.save();
-  }, [pdf, fileUrl, annotations]);
+  }, [pdf, fileUrl, annotations,historyState]);
 
   // Expose methods to parent component via ref
   useImperativeHandle(ref, () => ({
@@ -319,8 +396,9 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         console.error('Failed to generate annotated document URL:', error);
         return null;
       }
-    }
-  }), [generateAnnotatedPdf]);
+    },
+    getAnnotationData: () => safeGetAnnotationData(annotations, historyState)
+  }), [generateAnnotatedPdf, annotations, historyState]);
 
   const handleAction = useCallback(async (action: 'download' | 'print') => {
     setIsProcessing(true);
@@ -331,10 +409,18 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
             return;
         }
 
+        // Prepare annotation data to send to callbacks (safely handle large/circular data)
+        const annotationData = safeGetAnnotationData(annotations, historyState);
+
         const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
 
         if (action === 'download') {
+            // Call onSave callback if provided
+            if (onSave) {
+              onSave(annotationData);
+            }
+
             const link = document.createElement('a');
             link.href = url;
             link.download = `${fileName.replace('.pdf', '')}-annotated.pdf`;
@@ -343,6 +429,11 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
         } else { // print
+            // Call onPrint callback if provided
+            if (onPrint) {
+              onPrint(annotationData);
+            }
+
             const iframe = document.createElement('iframe');
             iframe.style.display = 'none';
             iframe.src = url;
@@ -372,7 +463,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
     } finally {
         setIsProcessing(false);
     }
-  }, [generateAnnotatedPdf, fileName]);
+  }, [generateAnnotatedPdf, fileName, annotations, historyState, onSave, onPrint]);
 
   const renderPages = () => {
     if (!pdf) return null;

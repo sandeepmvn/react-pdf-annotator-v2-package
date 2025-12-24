@@ -2,7 +2,7 @@
 import { useState, useCallback } from 'react';
 import { Annotations, Annotation } from '../types';
 
-interface HistoryState {
+export interface HistoryState {
   history: Annotations[];
   index: number;
 }
@@ -106,6 +106,8 @@ export const useAnnotationHistory = () => {
     undo, 
     redo, 
     canUndo, 
-    canRedo 
+    canRedo,
+    historyState: state, // Expose the full state for saving
+    setHistoryState: setState, // Expose the setter for loading
   };
 };
