@@ -72,6 +72,13 @@ export const useAnnotationHistory = () => {
     _updateHistoryWith(() => ({}));
   }, [_updateHistoryWith]);
 
+  const setAnnotations = useCallback((newAnnotations: Annotations) => {
+    setState({
+      history: [newAnnotations],
+      index: 0,
+    });
+  }, []);
+
   const undo = useCallback(() => {
     setState(prevState => ({
       ...prevState,
@@ -94,7 +101,8 @@ export const useAnnotationHistory = () => {
     addAnnotation, 
     deleteAnnotation,
     updateAnnotation,
-    clearAnnotations, 
+    clearAnnotations,
+    setAnnotations,
     undo, 
     redo, 
     canUndo, 

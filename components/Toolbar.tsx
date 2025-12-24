@@ -3,7 +3,7 @@ import React from 'react';
 import { AnnotationTool } from '../types';
 import { FONT_SIZES, STROKE_WIDTHS, STAMPS } from '../constants';
 import { 
-    SelectIcon, PenIcon, HighlighterIcon, FreeTextIcon, RectangleIcon, CircleIcon, EraserIcon, TrashIcon, 
+    SelectIcon, PenIcon, HighlighterIcon, FreeTextIcon, RectangleIcon, CircleIcon, TrashIcon, 
     ZoomInIcon, ZoomOutIcon, DownloadIcon, PrintIcon, UnderlineIcon, StrikeoutIcon, SquigglyIcon, 
     StampIcon, SignatureIcon, InitialsIcon, UndoIcon, RedoIcon 
 } from './Icons';
@@ -79,7 +79,6 @@ const Toolbar: React.FC<ToolbarProps> = (props) => {
     { tool: 'SELECT', icon: <SelectIcon />, label: 'Select' },
     { tool: 'PEN', icon: <PenIcon />, label: 'Pen' },
     { tool: 'HIGHLIGHTER', icon: <HighlighterIcon />, label: 'Highlighter' },
-    { tool: 'ERASER', icon: <EraserIcon />, label: 'Eraser' },
   ];
 
   const shapeTools: { tool: AnnotationTool, icon: React.ReactNode, label: string }[] = [

@@ -29,6 +29,7 @@ const PdfPage: React.FC<PdfPageProps> = (props) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [page, setPage] = useState<PDFPageProxy | null>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const renderTaskRef = useRef<any>(null);
 
   useEffect(() => {
     pdf.getPage(pageNumber).then(setPage);
@@ -40,6 +41,12 @@ const PdfPage: React.FC<PdfPageProps> = (props) => {
       const context = canvas.getContext('2d');
       if (!context) return;
 
+      // Cancel any ongoing render task before starting a new one
+      if (renderTaskRef.current) {
+        renderTaskRef.current.cancel();
+        renderTaskRef.current = null;
+      }
+
       const viewport = page.getViewport({ scale: zoom });
       canvas.width = viewport.width;
       canvas.height = viewport.height;
@@ -49,8 +56,27 @@ const PdfPage: React.FC<PdfPageProps> = (props) => {
         canvasContext: context,
         viewport: viewport,
       };
-      page.render(renderContext);
+      
+      const renderTask = page.render(renderContext);
+      renderTaskRef.current = renderTask;
+      
+      renderTask.promise.then(() => {
+        renderTaskRef.current = null;
+      }).catch((err: any) => {
+        if (err.name !== 'RenderingCancelledException') {
+          console.error('Error rendering page:', err);
+        }
+        renderTaskRef.current = null;
+      });
     }
+
+    // Cleanup function to cancel render task when component unmounts or dependencies change
+    return () => {
+      if (renderTaskRef.current) {
+        renderTaskRef.current.cancel();
+        renderTaskRef.current = null;
+      }
+    };
   }, [page, zoom]);
 
   return (

@@ -22,9 +22,10 @@ interface PdfViewerProps {
   fileName: string;
   readonly?: boolean;
   onAnnotationsChange?: (annotations: Record<number, Annotation[]>) => void;
+  initialAnnotations?: Record<number, Annotation[]>;
 }
 
-const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName, readonly = false, onAnnotationsChange }, ref) => {
+const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName, readonly = false, onAnnotationsChange, initialAnnotations }, ref) => {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -39,8 +40,9 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
   const [initialsData, setInitialsData] = useState<string | null>(null);
   const [showSignatureModal, setShowSignatureModal] = useState<'SIGNATURE' | 'INITIALS' | null>(null);
   const [activeStamp, setActiveStamp] = useState<string>('APPROVED');
+  const previousFileUrl = useRef<string>('');
 
-  const { annotations, addAnnotation, deleteAnnotation, updateAnnotation, clearAnnotations, undo, redo, canUndo, canRedo } = useAnnotationHistory();
+  const { annotations, addAnnotation, deleteAnnotation, updateAnnotation, clearAnnotations, undo, redo, canUndo, canRedo, setAnnotations } = useAnnotationHistory();
   const viewerRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -51,6 +53,13 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
     }
   }, [annotations, onAnnotationsChange]);
 
+  // Load initial annotations if provided
+  useEffect(() => {
+    if (initialAnnotations) {
+      setAnnotations(initialAnnotations);
+    }
+  }, [initialAnnotations, setAnnotations]);
+
   useEffect(() => {
     const loadPdf = async () => {
       try {
@@ -60,7 +69,13 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         setTotalPages(pdfDocument.numPages);
         pageRefs.current = Array(pdfDocument.numPages).fill(null);
         setCurrentPage(1);
-        clearAnnotations();
+        
+        // Only clear annotations if we're loading a completely different file
+        // This allows annotations to persist when reloading the same file or an annotated version
+        if (previousFileUrl.current !== '' && previousFileUrl.current !== fileUrl) {
+          clearAnnotations();
+        }
+        previousFileUrl.current = fileUrl;
       } catch (error) {
         console.error('Error loading PDF:', error);
         alert('Failed to load PDF file.');
@@ -142,11 +157,36 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
 
             switch (annotation.type) {
                 case 'PEN':
+                    if (annotation.points.length > 1) {
+                        // Draw each segment to ensure visibility
+                        for (let i = 0; i < annotation.points.length - 1; i++) {
+                            const p1 = annotation.points[i];
+                            const p2 = annotation.points[i + 1];
+                            pdfLibPage.drawLine({
+                                start: { x: p1.x * scaleX, y: y(p1.y) },
+                                end: { x: p2.x * scaleX, y: y(p2.y) },
+                                thickness: annotation.strokeWidth * scaleX,
+                                color: color,
+                                opacity: 1,
+                            });
+                        }
+                    }
+                    break;
                 case 'UNDERLINE':
                 case 'STRIKETHROUGH':
                     if (annotation.points.length > 1) {
-                        const path = annotation.points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x * scaleX} ${y(p.y)}`).join(' ');
-                        pdfLibPage.drawSvgPath(path, { borderColor: color, borderWidth: annotation.strokeWidth, borderLineCap: LineCapStyle.Round });
+                        // Draw line annotations
+                        for (let i = 0; i < annotation.points.length - 1; i++) {
+                            const p1 = annotation.points[i];
+                            const p2 = annotation.points[i + 1];
+                            pdfLibPage.drawLine({
+                                start: { x: p1.x * scaleX, y: y(p1.y) },
+                                end: { x: p2.x * scaleX, y: y(p2.y) },
+                                thickness: annotation.strokeWidth * scaleX,
+                                color: color,
+                                opacity: 1,
+                            });
+                        }
                     }
                     break;
                 case 'SQUIGGLY':
@@ -162,8 +202,18 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
                     break;
                 case 'HIGHLIGHTER':
                      if (annotation.points.length > 1) {
-                        const path = annotation.points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x * scaleX} ${y(p.y)}`).join(' ');
-                        pdfLibPage.drawSvgPath(path, { borderColor: color, borderWidth: annotation.strokeWidth * 5, opacity: 0.4, borderLineCap: LineCapStyle.Round, borderOpacity: 0.4 });
+                        // Draw thick semi-transparent lines for highlighter effect
+                        for (let i = 0; i < annotation.points.length - 1; i++) {
+                            const p1 = annotation.points[i];
+                            const p2 = annotation.points[i + 1];
+                            pdfLibPage.drawLine({
+                                start: { x: p1.x * scaleX, y: y(p1.y) },
+                                end: { x: p2.x * scaleX, y: y(p2.y) },
+                                thickness: annotation.strokeWidth * 5 * scaleX,
+                                color: color,
+                                opacity: 0.4,
+                            });
+                        }
                     }
                     break;
                 case 'RECTANGLE':

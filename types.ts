@@ -1,6 +1,6 @@
 
 export type AnnotationTool = 
-  | 'SELECT' | 'PEN' | 'HIGHLIGHTER' | 'TEXT' | 'RECTANGLE' | 'CIRCLE' | 'ERASER'
+  | 'SELECT' | 'PEN' | 'HIGHLIGHTER' | 'TEXT' | 'RECTANGLE' | 'CIRCLE'
   | 'UNDERLINE' | 'STRIKETHROUGH' | 'SQUIGGLY' | 'STAMP' | 'SIGNATURE' | 'INITIALS';
 
 export interface Point {

@@ -92,7 +92,7 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
     if (['TEXT', 'STAMP', 'SIGNATURE', 'INITIALS'].includes(activeTool)) return;
 
     setInteraction({ mode: 'drawing', startPos: pos });
-    if (['PEN', 'HIGHLIGHTER', 'ERASER', 'UNDERLINE', 'STRIKETHROUGH', 'SQUIGGLY'].includes(activeTool)) {
+    if (['PEN', 'HIGHLIGHTER', 'UNDERLINE', 'STRIKETHROUGH', 'SQUIGGLY'].includes(activeTool)) {
       setTempAnnotation({ type: activeTool, points: [pos], color: toolColor, strokeWidth, id: 'temp', page: 0 } as any);
     }
   };
@@ -160,7 +160,7 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
     if (activeTool === 'STAMP') {
         const now = new Date();
         const timestamp = now.toLocaleString();
-        addAnnotation({ type: 'STAMP', x: pos.x - 60, y: pos.y - 20, width: 120, height: 50, text: activeStamp, fontSize: 18, color: toolColor, strokeWidth: 2, timestamp } as any);
+        addAnnotation({ type: 'STAMP', x: pos.x - 70, y: pos.y - 25, width: 140, height: 55, text: activeStamp, fontSize: 18, color: toolColor, strokeWidth: 2, timestamp } as any);
     }
     if (activeTool === 'SIGNATURE' && signatureData) {
         addAnnotation({ type: 'SIGNATURE', x: pos.x - 75, y: pos.y - 37.5, width: 150, height: 75, imageData: signatureData, color: toolColor, strokeWidth: 0 } as any);
@@ -239,11 +239,20 @@ function renderAnnotation(ann: Annotation, selectedId: string | null, zoom: numb
 
     switch (ann.type) {
         case 'PEN':
+            const penPoints = ann.points.map(p => `${p.x * zoom},${p.y * zoom}`).join(' ');
+            element = <polyline points={penPoints} fill="none" {...baseProps} strokeLinecap="round" strokeLinejoin="round" />;
+            break;
         case 'UNDERLINE':
+            const ulPoints = ann.points.map(p => `${p.x * zoom},${p.y * zoom}`).join(' ');
+            element = <polyline points={ulPoints} fill="none" {...baseProps} strokeLinecap="round" />;
+            break;
         case 'STRIKETHROUGH':
+            const stPoints = ann.points.map(p => `${p.x * zoom},${p.y * zoom}`).join(' ');
+            element = <polyline points={stPoints} fill="none" {...baseProps} strokeLinecap="round" />;
+            break;
         case 'SQUIGGLY':
-            const points = ann.points.map(p => `${p.x * zoom},${p.y * zoom}`).join(' ');
-            element = <polyline points={points} fill="none" {...baseProps} />;
+            const sqPoints = ann.points.map(p => `${p.x * zoom},${p.y * zoom}`).join(' ');
+            element = <polyline points={sqPoints} fill="none" {...baseProps} />;
             break;
         case 'HIGHLIGHTER':
             const hlPoints = ann.points.map(p => `${p.x * zoom},${p.y * zoom}`).join(' ');
@@ -371,6 +380,7 @@ function getCursor(activeTool: AnnotationTool, selectedId: string | null, getMou
     if (activeTool === 'SELECT') return selectedId ? 'move' : 'default';
     if (['PEN', 'RECTANGLE', 'CIRCLE', 'HIGHLIGHTER', 'UNDERLINE', 'STRIKETHROUGH', 'SQUIGGLY'].includes(activeTool)) return 'crosshair';
     if (activeTool === 'TEXT') return 'text';
+    if (['STAMP', 'SIGNATURE', 'INITIALS'].includes(activeTool)) return 'crosshair';
     return 'default';
 }
 
