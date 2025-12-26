@@ -10,20 +10,20 @@ export interface HistoryState {
 export const useAnnotationHistory = () => {
   const [state, setState] = useState<HistoryState>({ history: [{}], index: 0 });
 
-  const annotations = state.history[state.index] ?? {};
+  const annotations = state?.history?.[state?.index ?? 0] ?? {};
 
   const _updateHistoryWith = useCallback((getNewAnnotations: (current: Annotations) => Annotations) => {
     setState(prevState => {
-      const currentAnnotations = prevState.history[prevState.index] ?? {};
+      const currentAnnotations = prevState?.history?.[prevState?.index ?? 0] ?? {};
       const newAnnotations = getNewAnnotations(currentAnnotations);
-      
+
       if (JSON.stringify(currentAnnotations) === JSON.stringify(newAnnotations)) {
         return prevState;
       }
-      
-      const newHistory = prevState.history.slice(0, prevState.index + 1);
+
+      const newHistory = (prevState?.history ?? [{}]).slice(0, (prevState?.index ?? 0) + 1);
       newHistory.push(newAnnotations);
-      
+
       return {
         history: newHistory,
         index: newHistory.length - 1,
@@ -82,19 +82,19 @@ export const useAnnotationHistory = () => {
   const undo = useCallback(() => {
     setState(prevState => ({
       ...prevState,
-      index: Math.max(0, prevState.index - 1),
+      index: Math.max(0, (prevState?.index ?? 0) - 1),
     }));
   }, []);
 
   const redo = useCallback(() => {
     setState(prevState => ({
       ...prevState,
-      index: Math.min(prevState.history.length - 1, prevState.index + 1),
+      index: Math.min((prevState?.history?.length ?? 1) - 1, (prevState?.index ?? 0) + 1),
     }));
   }, []);
 
-  const canUndo = state.index > 0;
-  const canRedo = state.index < state.history.length - 1;
+  const canUndo = (state?.index ?? 0) > 0;
+  const canRedo = (state?.index ?? 0) < ((state?.history?.length ?? 1) - 1);
 
   return { 
     annotations, 

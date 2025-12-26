@@ -32,6 +32,7 @@ interface PdfViewerProps {
   initialHistoryState?: HistoryState;
   onSave?: (data: AnnotationExportData) => void;
   onPrint?: (data: AnnotationExportData) => void;
+  onGetAnnotationData?: (data: AnnotationExportData) => void;
 }
 const ANNOTATION_METADATA_SUBJECT_PREFIX = 'PDF_ANNOTATOR_DATA::';
 
@@ -54,7 +55,7 @@ const safeGetAnnotationData = (annotations: Record<number, Annotation[]>, histor
   }
 };
 
-const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName, readonly = false, onAnnotationsChange, initialAnnotations, initialHistoryState, onSave, onPrint }, ref) => {
+const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName, readonly = false, onAnnotationsChange, initialAnnotations, initialHistoryState, onSave, onPrint, onGetAnnotationData }, ref) => {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -82,13 +83,21 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
   }, [annotations, onAnnotationsChange]);
 
   // Load initial annotations and history state if provided
+  // Track if we've loaded from props to avoid overwriting with PDF metadata
+  const hasPropsRef = useRef(false);
+
   useEffect(() => {
     if (initialHistoryState) {
       // If full history state is provided, use it (takes priority)
       setHistoryState(initialHistoryState);
+      hasPropsRef.current = true;
     } else if (initialAnnotations) {
       // Otherwise just set annotations
       setAnnotations(initialAnnotations);
+      hasPropsRef.current = true;
+    } else {
+      // If both are undefined/null, reset the flag so PDF metadata can be loaded
+      hasPropsRef.current = false;
     }
   }, [initialAnnotations, initialHistoryState, setAnnotations, setHistoryState]);
 
@@ -101,10 +110,11 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         setTotalPages(pdfDocument.numPages);
         pageRefs.current = Array(pdfDocument.numPages).fill(null);
         setCurrentPage(1);
-        
 
-        // 2. Load PDF with pdf-lib to check for metadata (only if no initial data provided)
-        if (!initialHistoryState && !initialAnnotations) {
+
+        // 2. Load PDF with pdf-lib to check for metadata (only if no initial data provided from props)
+        if (!hasPropsRef.current) {
+          console.log('Loading PDF metadata - no props provided');
           const pdfBytes = await fetch(fileUrl).then(res => res.arrayBuffer());
           const pdfDocForMeta = await PDFDocument.load(pdfBytes);
           const subject = pdfDocForMeta.getSubject();
@@ -113,20 +123,27 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
               try {
                 const jsonString = subject.substring(ANNOTATION_METADATA_SUBJECT_PREFIX.length);
                 const parsedState = JSON.parse(jsonString) as HistoryState;
+                console.log('Loaded annotations from PDF metadata:', parsedState);
                 setHistoryState(parsedState);
               } catch (parseError) {
                 console.error('Failed to parse annotation metadata:', parseError);
               }
+          } else {
+            console.log('No annotation metadata found in PDF');
           }
+        } else {
+          console.log('Skipping PDF metadata load - using props instead');
         }
-       
+
       } catch (error) {
         console.error('Error loading PDF:', error);
         alert('Failed to load PDF file.');
       }
     };
+
     loadPdf();
-  }, [fileUrl, setHistoryState, initialHistoryState, initialAnnotations]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileUrl]);
 
   const handlePageChange = (page: number) => {
     if (page > 0 && page <= totalPages) {
@@ -166,7 +183,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedAnnotationId, handleDeleteSelected, undo, redo]);
 
-  const generateAnnotatedPdf = useCallback(async () => {
+  const generateAnnotatedPdf = useCallback(async (renderAnnotations: boolean = false) => {
     if (!pdf) return null;
 
     const existingPdfBytes = await fetch(fileUrl).then(res => res.arrayBuffer());
@@ -186,8 +203,10 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         };
         const simplifiedJson = JSON.stringify(currentStateOnly);
         pdfDoc.setSubject(ANNOTATION_METADATA_SUBJECT_PREFIX + simplifiedJson);
+        console.log('Saved simplified annotation data to PDF metadata (full history too large)');
       } else {
         pdfDoc.setSubject(metadataString);
+        console.log('Saved full annotation history to PDF metadata');
       }
     } catch (error) {
       console.error('Failed to serialize history state:', error);
@@ -204,6 +223,13 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
       }
     }
 
+    // Only render annotations if explicitly requested (for print/final version)
+    if (!renderAnnotations) {
+      console.log('Saving PDF with metadata only (no visual rendering)');
+      return await pdfDoc.save();
+    }
+
+    console.log('Rendering annotations onto PDF');
     const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const helveticaBoldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const pdfLibPages = pdfDoc.getPages();
@@ -397,13 +423,23 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         return null;
       }
     },
-    getAnnotationData: () => safeGetAnnotationData(annotations, historyState)
-  }), [generateAnnotatedPdf, annotations, historyState]);
+    getAnnotationData: () => {
+      const data = safeGetAnnotationData(annotations, historyState);
+      // Call the callback if provided
+      if (onGetAnnotationData) {
+        onGetAnnotationData(data);
+      }
+      return data;
+    }
+  }), [generateAnnotatedPdf, annotations, historyState, onGetAnnotationData]);
 
   const handleAction = useCallback(async (action: 'download' | 'print') => {
     setIsProcessing(true);
     try {
-        const pdfBytes = await generateAnnotatedPdf();
+        // For print: render annotations onto PDF (visual output)
+        // For download: metadata only (editable when reopened)
+        const renderAnnotations = action === 'print';
+        const pdfBytes = await generateAnnotatedPdf(renderAnnotations);
         if (!pdfBytes) {
             setIsProcessing(false);
             return;

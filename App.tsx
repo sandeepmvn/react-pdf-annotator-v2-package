@@ -14,11 +14,7 @@ const SAMPLE_PDF_URL = 'https://mozilla.github.io/pdf.js/web/compressed.tracemon
 const ANNOTATION_METADATA_PREFIX = 'PDF_ANNOTATOR_DATA::';
 const parseAnnotationMetadata = (metadataString: string): HistoryState | null => {
   try {
-    if (!metadataString.startsWith(ANNOTATION_METADATA_PREFIX)) {
-      return null;
-    }
-    const jsonString = metadataString.substring(ANNOTATION_METADATA_PREFIX.length);
-    return JSON.parse(jsonString) as HistoryState;
+    return JSON.parse(metadataString) as HistoryState;
   } catch (error) {
     console.error('Failed to parse annotation metadata:', error);
     return null;
@@ -61,6 +57,22 @@ const App: React.FC = () => {
     // Handle print callback if needed
   }, []);
 
+  // Callback when annotation data is requested via getAnnotationData()
+  const handleGetAnnotationData = useCallback((data: AnnotationExportData) => {
+    console.log('Annotation data requested:', data);
+    console.log(JSON.stringify(data));  
+    console.log('Total pages with annotations:', Object.keys(data.annotations).length);
+    console.log('History states count:', data.historyState.history.length);
+  }, []);
+
+  // Test function to manually request annotation data
+  const testGetAnnotationData = () => {
+    if (pdfViewerRef.current) {
+      const data = pdfViewerRef.current.getAnnotationData();
+      alert(`Got annotation data! Pages: ${Object.keys(data.annotations).length}, Check console for details.`);
+    }
+  };
+
   const handleGetAnnotatedPdf = async () => {
     if (!pdfViewerRef.current) return;
     
@@ -81,6 +93,7 @@ const App: React.FC = () => {
     if (file && file.type === 'application/pdf') {
       setFileName(file.name);
       setPdfFile(URL.createObjectURL(file));
+      setInitialHistoryState(undefined); // Clear props to allow PDF metadata loading
     } else {
       alert('Please select a valid PDF file.');
     }
@@ -134,13 +147,6 @@ const App: React.FC = () => {
             </span>
             <div className="flex gap-2">
               <button
-                onClick={loadFromLocalStorage}
-                className="bg-green-500 text-white px-3 py-1 rounded text-sm font-semibold hover:bg-green-600 transition-colors"
-                title="Load saved annotations from browser storage"
-              >
-                Load Saved
-              </button>
-              <button
                 onClick={() => {
                   const metadata = prompt('Paste the annotation metadata string (starts with PDF_ANNOTATOR_DATA::)');
                   if (metadata) loadFromMetadataString(metadata);
@@ -149,6 +155,13 @@ const App: React.FC = () => {
                 title="Load annotations from metadata string"
               >
                 Load from String
+              </button>
+              <button
+                onClick={testGetAnnotationData}
+                className="bg-purple-500 text-white px-3 py-1 rounded text-sm font-semibold hover:bg-purple-600 transition-colors"
+                title="Test onGetAnnotationData callback"
+              >
+                Get Data (Test)
               </button>
               {annotationsCount > 0 && (
                 <button
@@ -162,13 +175,13 @@ const App: React.FC = () => {
           </div>
           <PdfViewer
             ref={pdfViewerRef}
-            key={pdfFile}
             fileUrl={pdfFile}
             fileName={fileName}
             onAnnotationsChange={handleAnnotationsChange}
             initialHistoryState={initialHistoryState}
             onSave={handleSave}
             onPrint={handlePrint}
+            onGetAnnotationData={handleGetAnnotationData}
           />
         </>
       ) : (

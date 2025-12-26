@@ -88,8 +88,6 @@ const Toolbar: React.FC<ToolbarProps> = (props) => {
 
   const textTools: { tool: AnnotationTool, icon: React.ReactNode, label: string }[] = [
     { tool: 'TEXT', icon: <FreeTextIcon />, label: 'Free Text' },
-    { tool: 'UNDERLINE', icon: <UnderlineIcon />, label: 'Underline' },
-    { tool: 'STRIKETHROUGH', icon: <StrikeoutIcon />, label: 'Strikethrough' },
     { tool: 'SQUIGGLY', icon: <SquigglyIcon />, label: 'Squiggly' },
   ];
 
@@ -102,7 +100,7 @@ const Toolbar: React.FC<ToolbarProps> = (props) => {
           <div className="flex items-center gap-2">
             <button onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage <= 1} className="p-2 rounded-md hover:bg-gray-700 disabled:opacity-50">‹</button>
             <div className="flex items-center">
-              <input type="number" value={currentPage} onChange={handlePageInputChange} className="w-12 text-center bg-gray-800 rounded-md border border-gray-700" />
+              <input type="number" value={currentPage} onChange={handlePageInputChange} className="w-12 text-center bg-white-800 rounded-md border border-gray-700" />
               <span className="mx-2">/</span><span>{totalPages}</span>
             </div>
             <button onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage >= totalPages} className="p-2 rounded-md hover:bg-gray-700 disabled:opacity-50">›</button>
@@ -110,7 +108,7 @@ const Toolbar: React.FC<ToolbarProps> = (props) => {
           <div className="w-px h-6 bg-gray-700"></div>
           <div className="flex items-center gap-2">
             <ToolButton label="Zoom Out" onClick={() => setZoom(Math.max(0.25, zoom - 0.25))}><ZoomOutIcon /></ToolButton>
-            <span className="w-16 text-center cursor-pointer" onClick={() => setZoom(1)}>{Math.round(zoom * 100)}%</span>
+            <span className="w-16 text-center bg-white-800 rounded-md border border-gray-700 cursor-pointer" onClick={() => setZoom(1)}>{Math.round(zoom * 100)}%</span>
             <ToolButton label="Zoom In" onClick={() => setZoom(Math.min(4, zoom + 0.25))}><ZoomInIcon /></ToolButton>
           </div>
         </div>
@@ -144,26 +142,20 @@ const Toolbar: React.FC<ToolbarProps> = (props) => {
         <div className="flex items-center gap-1 bg-gray-800 p-1 rounded-lg">
           {textTools.map(t => <ToolButton key={t.tool} label={t.label} isActive={activeTool === t.tool} onClick={() => setActiveTool(t.tool)}>{t.icon}</ToolButton>)}
         </div>
-        {/* Sign */}
-        <div className="flex items-center gap-1 bg-gray-800 p-1 rounded-lg">
-            <ToolButton label="Add Signature" isActive={activeTool === 'SIGNATURE'} onClick={() => setActiveTool('SIGNATURE')}><SignatureIcon /></ToolButton>
-            <ToolButton label="Add Initials" isActive={activeTool === 'INITIALS'} onClick={() => setActiveTool('INITIALS')}><InitialsIcon /></ToolButton>
-            <ToolButton label="Create Signature/Initials" onClick={onSignatureClick}>Edit Sigs</ToolButton>
-        </div>
         {/* Stamp */}
         <div className="flex items-center gap-1 bg-gray-800 p-1 rounded-lg">
             <ToolButton label="Stamp" isActive={activeTool === 'STAMP'} onClick={() => setActiveTool('STAMP')}><StampIcon /></ToolButton>
-            <select value={activeStamp} onChange={e => setActiveStamp(e.target.value)} className="bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <select value={activeStamp} onChange={e => setActiveStamp(e.target.value)} className="bg-white-700 border border-gray-600 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 {STAMPS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
         </div>
         {/* Properties */}
         <div className="flex items-center gap-2 bg-gray-800 p-1 rounded-lg">
           <input type="color" value={toolColor} onChange={(e) => setToolColor(e.target.value)} className="w-8 h-8 p-0 border-none rounded-md cursor-pointer bg-transparent" title="Select color" />
-          <select value={strokeWidth} onChange={(e) => setStrokeWidth(Number(e.target.value))} className="bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" title="Stroke Width">
+          <select value={strokeWidth} onChange={(e) => setStrokeWidth(Number(e.target.value))} className="bg-white-700 border border-gray-600 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" title="Stroke Width">
             {STROKE_WIDTHS.map(w => <option key={w} value={w}>{w}px</option>)}
           </select>
-          <select value={fontSize} onChange={(e) => setFontSize(Number(e.target.value))} className="bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" title="Font Size">
+          <select value={fontSize} onChange={(e) => setFontSize(Number(e.target.value))} className="bg-white-700 border border-gray-600 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" title="Font Size">
             {FONT_SIZES.map(s => <option key={s} value={s}>{s}pt</option>)}
           </select>
         </div>
