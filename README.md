@@ -8,9 +8,8 @@ A feature-rich, fully customizable PDF viewer and annotator component for React 
 - 🎨 **Drawing Tools**: Pen and highlighter with customizable colors and stroke widths
 - ✏️ **Text Annotation**: Add text boxes with custom colors and font sizes
 - 📐 **Shapes**: Rectangle and circle annotations
-- 🖍️ **Text Markup**: Underline, strikethrough, and squiggly line tools
+- 🖍️ **Text Markup**: squiggly line tool
 - 🔖 **Stamps**: Pre-defined stamps (Approved, Confidential, etc.)
-- ✍️ **Digital Signatures**: Draw and add signatures and initials
 - ↩️ **Undo/Redo**: Full history management for all annotations
 - 💾 **Export**: Download annotated PDFs with all annotations embedded
 - 🎯 **TypeScript**: Fully typed for better development experience
