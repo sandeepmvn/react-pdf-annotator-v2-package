@@ -115,7 +115,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
 
         // 2. Load PDF with pdf-lib to check for metadata (only if no initial data provided from props)
         if (!hasPropsRef.current) {
-          console.log('Loading PDF metadata - no props provided');
+         
           const pdfBytes = await fetch(fileUrl).then(res => res.arrayBuffer());
           const pdfDocForMeta = await PDFDocument.load(pdfBytes);
           const subject = pdfDocForMeta.getSubject();
@@ -124,21 +124,17 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
               try {
                 const jsonString = subject.substring(ANNOTATION_METADATA_SUBJECT_PREFIX.length);
                 const parsedState = JSON.parse(jsonString) as HistoryState;
-                console.log('Loaded annotations from PDF metadata:', parsedState);
                 setHistoryState(parsedState);
               } catch (parseError) {
                 console.error('Failed to parse annotation metadata:', parseError);
               }
           } else {
-            console.log('No annotation metadata found in PDF');
+            //console.log('No annotation metadata found in PDF');
           }
-        } else {
-          console.log('Skipping PDF metadata load - using props instead');
-        }
+        } 
 
       } catch (error) {
         console.error('Error loading PDF:', error);
-        alert('Failed to load PDF file.');
       }
     };
 
@@ -216,10 +212,10 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         };
         const simplifiedJson = JSON.stringify(currentStateOnly);
         pdfDoc.setSubject(ANNOTATION_METADATA_SUBJECT_PREFIX + simplifiedJson);
-        console.log('Saved simplified annotation data to PDF metadata (full history too large)');
+       // console.log('Saved simplified annotation data to PDF metadata (full history too large)');
       } else {
         pdfDoc.setSubject(metadataString);
-        console.log('Saved full annotation history to PDF metadata');
+        //console.log('Saved full annotation history to PDF metadata');
       }
     } catch (error) {
       console.error('Failed to serialize history state:', error);
@@ -238,7 +234,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
 
     // Only render annotations if explicitly requested (for print/final version)
     if (!renderAnnotations) {
-      console.log('Saving PDF with metadata only (no visual rendering)');
+      //console.log('Saving PDF with metadata only (no visual rendering)');
       return await pdfDoc.save();
     }
 
@@ -256,10 +252,10 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         const pageAnnotations = annotations[pageNum];
         const pdfLibPage = pdfLibPages[pageNum - 1];
         const { width: pdfLibPageWidth, height: pdfLibPageHeight } = pdfLibPage.getSize();
-        
+
         const pdfjsPage = await pdf.getPage(pageNum);
         const viewport = pdfjsPage.getViewport({ scale: 1 });
-        
+
         const scaleX = pdfLibPageWidth / viewport.width;
         const scaleY = pdfLibPageHeight / viewport.height;
 
@@ -508,7 +504,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         }
     } catch (error) {
         console.error(`Failed to ${action} annotated PDF:`, error);
-        alert(`An error occurred while preparing the PDF for ${action}.`);
+        
     } finally {
         setIsProcessing(false);
     }
