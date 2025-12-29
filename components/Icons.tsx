@@ -10,7 +10,7 @@ const iconProps = {
 };
 
 export const SelectIcon = () => (
-  <svg {...iconProps}><path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zM12 2.25a8.25 8.25 0 00-8.25 8.25c0 1.913.64 3.705 1.75 5.25l.224.332.224-.332a8.25 8.25 0 005.252-10.5" /></svg>
+  <svg {...iconProps}><path strokeLinecap="round" strokeLinejoin="round" d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" fill="currentColor" /></svg>
 );
 
 export const PenIcon = () => (
@@ -18,11 +18,11 @@ export const PenIcon = () => (
 );
 
 export const HighlighterIcon = () => (
-  <svg {...iconProps}><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.667 0l3.181-3.183m-4.991 0l-2.07 2.07a8.25 8.25 0 01-11.667 0l-2.07-2.07m4.992 0l.043.043a8.25 8.25 0 0111.667 0l.043-.043m-11.75 0h11.75" /></svg>
+  <svg {...iconProps}><path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" /></svg>
 );
 
 export const FreeTextIcon = () => (
-    <svg {...iconProps}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zm0 0c0 1.657 1.007 3 2.25 3S21 13.657 21 12a9 9 0 10-2.636 6.364M16.5 12V8.25" /></svg>
+    <svg {...iconProps}><text x="12" y="17" fontSize="16" fontWeight="bold" textAnchor="middle" fill="currentColor" stroke="none">T</text></svg>
 );
 
 export const RectangleIcon = () => (
@@ -74,7 +74,7 @@ export const SquigglyIcon = () => (
 );
 
 export const StampIcon = () => (
-    <svg {...iconProps}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v7.5a2.25 2.25 0 002.25 2.25z" /></svg>
+    <svg {...iconProps}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m-6 4h12m-6-8a2 2 0 100-4 2 2 0 000 4z" /><rect x="6" y="16" width="12" height="4" stroke="currentColor" strokeWidth="1.5" fill="none" rx="1" /><path strokeLinecap="round" strokeLinejoin="round" d="M6 20h12" /></svg>
 );
 
 export const SignatureIcon = () => (

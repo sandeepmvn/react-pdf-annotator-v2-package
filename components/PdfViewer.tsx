@@ -515,7 +515,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
     const pages = [];
     for (let i = 1; i <= totalPages; i++) {
       pages.push(
-        <div key={i} ref={el => { pageRefs.current[i - 1] = el; }} data-page-number={i}>
+        <div key={i} ref={el => { pageRefs.current[i - 1] = el; }} data-page-number={i} className="mb-4">
             <PdfPage
               pdf={pdf}
               pageNumber={i}
@@ -583,7 +583,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         setActiveStamp={setActiveStamp}
         readonly={readonly}
       />
-      <div ref={viewerRef} className="bg-gray-900 p-4 overflow-y-auto flex-1">
+      <div ref={viewerRef} className="bg-gray-50 p-4 overflow-y-auto flex-1">
         <div id="pdf-print-area" className="mx-auto">
           {pdf ? renderPages() : <div className="flex items-center justify-center h-full"><p className="text-xl">Loading PDF...</p></div>}
         </div>
