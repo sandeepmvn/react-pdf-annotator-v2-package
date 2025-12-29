@@ -1,6 +1,6 @@
 {
   "name": "@sandeepmvn/react-pdf-annotator-v2",
-  "version": "1.2.8",
+  "version": "1.2.10",
   "description": "A feature-rich PDF viewer and annotator component for React applications with drawing, text, shapes, and signature support",
   "type": "module",
   "main": "./dist/react-pdf-annotator.umd.js",

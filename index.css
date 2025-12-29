@@ -1,20 +1,34 @@
 
-@tailwind base;
+/* Only include Tailwind utilities and components, NOT the base/preflight styles */
+/* This prevents conflicts with the host application's global styles */
 @tailwind components;
 @tailwind utilities;
 
-/* Custom scrollbar for a more polished look */
-::-webkit-scrollbar {
+/* Custom scrollbar styles for PDF viewer - scoped to component only */
+.react-pdf-annotator-container ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
-::-webkit-scrollbar-track {
+.react-pdf-annotator-container ::-webkit-scrollbar-track {
   background: #2d3748; /* bg-gray-800 */
 }
-::-webkit-scrollbar-thumb {
+.react-pdf-annotator-container ::-webkit-scrollbar-thumb {
   background: #4a5568; /* bg-gray-600 */
   border-radius: 4px;
 }
-::-webkit-scrollbar-thumb:hover {
+.react-pdf-annotator-container ::-webkit-scrollbar-thumb:hover {
   background: #718096; /* bg-gray-500 */
+}
+
+/* Ensure basic box-sizing for all elements within the component */
+.react-pdf-annotator-container,
+.react-pdf-annotator-container * {
+  box-sizing: border-box;
+}
+
+/* Ensure the component is self-contained and doesn't affect parent scrolling */
+.react-pdf-annotator-container {
+  position: relative;
+  isolation: isolate;
+  contain: layout style;
 }

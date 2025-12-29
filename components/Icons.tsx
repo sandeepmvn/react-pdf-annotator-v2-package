@@ -92,3 +92,7 @@ export const UndoIcon = () => (
 export const RedoIcon = () => (
     <svg {...iconProps}><path strokeLinecap="round" strokeLinejoin="round" d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3" /></svg>
 );
+
+export const MoreIcon = () => (
+    <svg {...iconProps}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" /></svg>
+);

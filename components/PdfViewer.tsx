@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
+import * as pdfjsLib from 'pdfjs-dist';
 import type { PDFDocumentProxy } from 'pdfjs-dist/types/src/display/api';
 import Toolbar from './Toolbar';
 import PdfPage from './PdfPage';
@@ -9,8 +10,8 @@ import { AnnotationTool, Annotation } from '../types';
 import { PDFDocument, rgb, StandardFonts, LineCapStyle, PDFImage } from 'pdf-lib';
 import { DEFAULT_COLOR, DEFAULT_FONT_SIZE, DEFAULT_STROKE_WIDTH } from '../constants';
 
-// Fix: Declare pdfjsLib as a global variable to satisfy TypeScript when using the CDN version.
-declare const pdfjsLib: any;
+// Configure the worker for pdfjs-dist
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
 export interface AnnotationExportData {
   annotations: Record<number, Annotation[]>;
@@ -148,7 +149,19 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
   const handlePageChange = (page: number) => {
     if (page > 0 && page <= totalPages) {
       setCurrentPage(page);
-      pageRefs.current[page - 1]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Scroll within the viewer container only, not the entire page
+      const pageElement = pageRefs.current[page - 1];
+      if (pageElement && viewerRef.current) {
+        const containerTop = viewerRef.current.scrollTop;
+        const containerRect = viewerRef.current.getBoundingClientRect();
+        const pageRect = pageElement.getBoundingClientRect();
+        const relativeTop = pageRect.top - containerRect.top + containerTop;
+
+        viewerRef.current.scrollTo({
+          top: relativeTop,
+          behavior: 'smooth'
+        });
+      }
     }
   };
 
@@ -446,7 +459,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         }
 
         // Prepare annotation data to send to callbacks (safely handle large/circular data)
-        const annotationData = safeGetAnnotationData(annotations, historyState);
+       const annotationData = safeGetAnnotationData(annotations, historyState);
 
         const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
@@ -533,7 +546,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
   };
 
   return (
-    <div className="flex flex-col h-screen w-full">
+    <div className="react-pdf-annotator-container flex flex-col h-full w-full overflow-hidden">
       {showSignatureModal && (
         <SignatureModal
           title={showSignatureModal === 'SIGNATURE' ? 'Create Signature' : 'Create Initials'}
@@ -574,7 +587,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         setActiveStamp={setActiveStamp}
         readonly={readonly}
       />
-      <div ref={viewerRef} className="flex-grow overflow-auto bg-gray-800 p-4">
+      <div ref={viewerRef} className="bg-gray-900 p-4 overflow-y-auto flex-1">
         <div id="pdf-print-area" className="mx-auto">
           {pdf ? renderPages() : <div className="flex items-center justify-center h-full"><p className="text-xl">Loading PDF...</p></div>}
         </div>
