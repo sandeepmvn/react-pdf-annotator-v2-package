@@ -265,7 +265,16 @@ function renderAnnotation(ann: Annotation, selectedId: string | null, zoom: numb
             element = <ellipse cx={ann.cx * zoom} cy={ann.cy * zoom} rx={ann.rx * zoom} ry={ann.ry * zoom} fill="none" {...baseProps} />;
             break;
         case 'TEXT':
-            element = <text x={ann.x * zoom} y={ann.y * zoom + ann.fontSize * zoom} fill={ann.color} fontSize={ann.fontSize * zoom} style={{ whiteSpace: 'pre-wrap' }}>{ann.content}</text>;
+            const textLines = ann.content.split('\n');
+            element = (
+                <text x={ann.x * zoom} y={ann.y * zoom + ann.fontSize * zoom} fill={ann.color} fontSize={ann.fontSize * zoom}>
+                    {textLines.map((line, index) => (
+                        <tspan key={index} x={ann.x * zoom} dy={index === 0 ? 0 : ann.fontSize * zoom * 1.2}>
+                            {line}
+                        </tspan>
+                    ))}
+                </text>
+            );
             break;
         case 'STAMP':
             element = <g>
@@ -290,7 +299,9 @@ function getAnnotationBoundingBox(ann: Annotation): { minX: number; minY: number
         case 'RECTANGLE': case 'STAMP': case 'SIGNATURE': case 'INITIALS':
             return { minX: ann.x, minY: ann.y, maxX: ann.x + ann.width, maxY: ann.y + ann.height };
         case 'TEXT':
-            return { minX: ann.x, minY: ann.y, maxX: ann.x + ann.width, maxY: ann.y + ann.fontSize };
+            const lineCount = ann.content.split('\n').length;
+            const textHeight = ann.fontSize * lineCount * 1.2;
+            return { minX: ann.x, minY: ann.y, maxX: ann.x + ann.width, maxY: ann.y + textHeight };
         case 'CIRCLE':
             return { minX: ann.cx - ann.rx, minY: ann.cy - ann.ry, maxX: ann.cx + ann.rx, maxY: ann.cy + ann.ry };
         case 'PEN': case 'HIGHLIGHTER': case 'UNDERLINE': case 'STRIKETHROUGH': case 'SQUIGGLY':

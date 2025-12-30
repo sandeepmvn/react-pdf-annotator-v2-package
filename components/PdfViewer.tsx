@@ -349,12 +349,15 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
                     });
                     break;
                 case 'TEXT':
-                    pdfLibPage.drawText(annotation.content, {
-                        x: annotation.x * scaleX,
-                        y: y(annotation.y + annotation.fontSize),
-                        size: annotation.fontSize * scaleY,
-                        font: helveticaFont,
-                        color,
+                    const textLines = annotation.content.split('\n');
+                    textLines.forEach((line, index) => {
+                        pdfLibPage.drawText(line, {
+                            x: annotation.x * scaleX,
+                            y: y(annotation.y + annotation.fontSize + (index * annotation.fontSize * 1.2)),
+                            size: annotation.fontSize * scaleY,
+                            font: helveticaFont,
+                            color,
+                        });
                     });
                     break;
                 case 'STAMP':
