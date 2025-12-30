@@ -180,6 +180,7 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
         x: isTexting.x,
         y: isTexting.y,
         width: textInputRef.current.offsetWidth / zoom,
+        height: textInputRef.current.offsetHeight / zoom,
         content,
         fontSize: fontSize,
         color: toolColor,
@@ -218,9 +219,9 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
             minWidth: '150px',
             height: 'auto',
             minHeight: `${fontSize * 1.5}px`,
-            resize: 'horizontal',
+            resize: 'both',
             outline: 'none',
-            overflow: 'hidden',
+            overflow: 'auto',
             zIndex: 100,
             fontFamily: 'sans-serif',
           }}
@@ -267,13 +268,28 @@ function renderAnnotation(ann: Annotation, selectedId: string | null, zoom: numb
         case 'TEXT':
             const textLines = ann.content.split('\n');
             element = (
-                <text x={ann.x * zoom} y={ann.y * zoom + ann.fontSize * zoom} fill={ann.color} fontSize={ann.fontSize * zoom}>
-                    {textLines.map((line, index) => (
-                        <tspan key={index} x={ann.x * zoom} dy={index === 0 ? 0 : ann.fontSize * zoom * 1.2}>
-                            {line}
-                        </tspan>
-                    ))}
-                </text>
+                <g>
+                    {/* Optional: Show text box background when selected */}
+                    {isSelected && (
+                        <rect
+                            x={ann.x * zoom}
+                            y={ann.y * zoom}
+                            width={ann.width * zoom}
+                            height={(ann.height || (textLines.length * ann.fontSize * 1.2)) * zoom}
+                            fill="rgba(255,255,255,0.1)"
+                            stroke={ann.color}
+                            strokeWidth="0.5"
+                            strokeDasharray="2,2"
+                        />
+                    )}
+                    <text x={ann.x * zoom} y={ann.y * zoom + ann.fontSize * zoom} fill={ann.color} fontSize={ann.fontSize * zoom}>
+                        {textLines.map((line, index) => (
+                            <tspan key={index} x={ann.x * zoom} dy={index === 0 ? 0 : ann.fontSize * zoom * 1.2}>
+                                {line}
+                            </tspan>
+                        ))}
+                    </text>
+                </g>
             );
             break;
         case 'STAMP':
@@ -299,8 +315,8 @@ function getAnnotationBoundingBox(ann: Annotation): { minX: number; minY: number
         case 'RECTANGLE': case 'STAMP': case 'SIGNATURE': case 'INITIALS':
             return { minX: ann.x, minY: ann.y, maxX: ann.x + ann.width, maxY: ann.y + ann.height };
         case 'TEXT':
-            const lineCount = ann.content.split('\n').length;
-            const textHeight = ann.fontSize * lineCount * 1.2;
+            // Use stored height if available, otherwise calculate from line count
+            const textHeight = ann.height || (ann.content.split('\n').length * ann.fontSize * 1.2);
             return { minX: ann.x, minY: ann.y, maxX: ann.x + ann.width, maxY: ann.y + textHeight };
         case 'CIRCLE':
             return { minX: ann.cx - ann.rx, minY: ann.cy - ann.ry, maxX: ann.cx + ann.rx, maxY: ann.cy + ann.ry };
@@ -375,13 +391,20 @@ function moveAnnotation<T extends Annotation>(ann: T, dx: number, dy: number): T
 function resizeAnnotation<T extends Annotation>(ann: T, handle: ResizeHandle, dx: number, dy: number): T {
     const newAnn = JSON.parse(JSON.stringify(ann));
     // This is a simplified resize logic. A full implementation would be more complex.
-    if (newAnn.type === 'RECTANGLE' || newAnn.type === 'SIGNATURE' || newAnn.type === 'INITIALS' || newAnn.type === 'STAMP') {
+    if (newAnn.type === 'RECTANGLE' || newAnn.type === 'SIGNATURE' || newAnn.type === 'INITIALS' || newAnn.type === 'STAMP' || newAnn.type === 'TEXT') {
         if (handle.includes('l')) { newAnn.x += dx; newAnn.width -= dx; }
         if (handle.includes('r')) { newAnn.width += dx; }
         if (handle.includes('t')) { newAnn.y += dy; newAnn.height -= dy; }
         if (handle.includes('b')) { newAnn.height += dy; }
         if (newAnn.width < 0) { newAnn.x += newAnn.width; newAnn.width *= -1; }
         if (newAnn.height < 0) { newAnn.y += newAnn.height; newAnn.height *= -1; }
+
+        // Ensure minimum dimensions for TEXT
+        if (newAnn.type === 'TEXT') {
+            if (newAnn.width < 50) newAnn.width = 50;
+            if (!newAnn.height) newAnn.height = newAnn.fontSize * 1.5;
+            if (newAnn.height < newAnn.fontSize * 1.2) newAnn.height = newAnn.fontSize * 1.2;
+        }
     }
     return newAnn;
 }

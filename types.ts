@@ -30,6 +30,7 @@ export interface TextAnnotation extends BaseAnnotation {
   x: number;
   y: number;
   width: number;
+  height?: number;
   content: string;
   fontSize: number;
 }
