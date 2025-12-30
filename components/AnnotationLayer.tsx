@@ -40,10 +40,11 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
     startPos: Point;
     originalAnnotation?: Annotation;
   }>({ mode: 'none', startPos: {x: 0, y: 0} });
-  
+
   const [tempAnnotation, setTempAnnotation] = useState<Annotation | null>(null);
   const textInputRef = useRef<HTMLTextAreaElement>(null);
   const [isTexting, setIsTexting] = useState<Point | null>(null);
+  const [hoverHandle, setHoverHandle] = useState<ResizeHandle | null>(null);
 
   const getMousePos = (e: ReactMouseEvent): Point => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -99,9 +100,37 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
 
   const handleMouseMove = (e: ReactMouseEvent) => {
     if (readonly) return;
-    
+
     const currentPos = getMousePos(e);
-    
+
+    // Update hover handle for cursor changes when in SELECT mode
+    if (activeTool === 'SELECT' && interaction.mode === 'none' && selectedAnnotationId) {
+        const selectedAnn = annotations.find(ann => ann.id === selectedAnnotationId);
+        if (selectedAnn) {
+            const box = getAnnotationBoundingBox(selectedAnn);
+            if (box) {
+                const handles = getResizeHandles(box);
+                let foundHandle: ResizeHandle | null = null;
+                for (const handleKey in handles) {
+                    const handlePos = handles[handleKey as ResizeHandle];
+                    const handleSize = 8 / zoom;
+                    if (currentPos.x >= handlePos.x - handleSize / 2 && currentPos.x <= handlePos.x + handleSize / 2 &&
+                        currentPos.y >= handlePos.y - handleSize / 2 && currentPos.y <= handlePos.y + handleSize / 2) {
+                        foundHandle = handleKey as ResizeHandle;
+                        break;
+                    }
+                }
+                setHoverHandle(foundHandle);
+            } else {
+                setHoverHandle(null);
+            }
+        } else {
+            setHoverHandle(null);
+        }
+    } else if (interaction.mode === 'none') {
+        setHoverHandle(null);
+    }
+
     if (interaction.mode === 'moving' && interaction.originalAnnotation) {
         const dx = currentPos.x - interaction.startPos.x;
         const dy = currentPos.y - interaction.startPos.y;
@@ -197,8 +226,10 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
       annotationsToRender.push(tempAnnotation);
   }
 
+  const cursor = getCursor(activeTool, selectedAnnotationId, hoverHandle, interaction.mode);
+
   return (
-    <div className="absolute top-0 left-0" style={{ cursor: getCursor(activeTool, selectedAnnotationId, getMousePos, annotations, zoom) }}>
+    <div className="absolute top-0 left-0" style={{ cursor }}>
       <svg width={width} height={height} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onClick={handleSvgClick}>
         {annotationsToRender.map(ann => renderAnnotation(ann, selectedAnnotationId, zoom))}
       </svg>
@@ -409,8 +440,36 @@ function resizeAnnotation<T extends Annotation>(ann: T, handle: ResizeHandle, dx
     return newAnn;
 }
 
-function getCursor(activeTool: AnnotationTool, selectedId: string | null, getMousePos: (e: any) => Point, annotations: Annotation[], zoom: number): string {
-    // This is a placeholder for a more complex cursor logic based on hover state
+function getCursor(activeTool: AnnotationTool, selectedId: string | null, hoverHandle: ResizeHandle | null, interactionMode: InteractionMode): string {
+    // Show resize cursors when hovering over handles
+    if (activeTool === 'SELECT' && hoverHandle && interactionMode === 'none') {
+        switch (hoverHandle) {
+            case 'tl':
+            case 'br':
+                return 'nwse-resize';
+            case 'tr':
+            case 'bl':
+                return 'nesw-resize';
+            case 't':
+            case 'b':
+                return 'ns-resize';
+            case 'l':
+            case 'r':
+                return 'ew-resize';
+        }
+    }
+
+    // Show resize cursors during resizing
+    if (interactionMode === 'resizing') {
+        return 'grabbing';
+    }
+
+    // Show move cursor during moving
+    if (interactionMode === 'moving') {
+        return 'grabbing';
+    }
+
+    // Default cursors for tools
     if (activeTool === 'SELECT') return selectedId ? 'move' : 'default';
     if (['PEN', 'RECTANGLE', 'CIRCLE', 'HIGHLIGHTER', 'UNDERLINE', 'STRIKETHROUGH', 'SQUIGGLY'].includes(activeTool)) return 'crosshair';
     if (activeTool === 'TEXT') return 'text';
