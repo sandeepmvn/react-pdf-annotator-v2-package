@@ -56,8 +56,13 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
 
   const handleMouseDown = (e: ReactMouseEvent) => {
     if (readonly) return;
-    
+
     const pos = getMousePos(e);
+
+    // PAN mode - don't handle here, let the parent container handle it
+    if (activeTool === 'PAN') {
+      return;
+    }
 
     if (activeTool === 'SELECT') {
         const selectedAnn = annotations.find(ann => ann.id === selectedAnnotationId);
@@ -229,8 +234,25 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
   const cursor = getCursor(activeTool, selectedAnnotationId, hoverHandle, interaction.mode);
 
   return (
-    <div className="absolute top-0 left-0" style={{ cursor }}>
-      <svg width={width} height={height} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onClick={handleSvgClick}>
+    <div
+      className="absolute top-0 left-0"
+      style={{
+        cursor,
+        pointerEvents: activeTool === 'PAN' ? 'none' : 'auto'
+      }}
+    >
+      <svg
+        width={width}
+        height={height}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onClick={handleSvgClick}
+        style={{
+          pointerEvents: activeTool === 'PAN' ? 'none' : 'auto'
+        }}
+      >
         {annotationsToRender.map(ann => renderAnnotation(ann, selectedAnnotationId, zoom))}
       </svg>
       {isTexting && (
@@ -441,6 +463,11 @@ function resizeAnnotation<T extends Annotation>(ann: T, handle: ResizeHandle, dx
 }
 
 function getCursor(activeTool: AnnotationTool, selectedId: string | null, hoverHandle: ResizeHandle | null, interactionMode: InteractionMode): string {
+    // PAN mode cursor
+    if (activeTool === 'PAN') {
+        return 'grab';
+    }
+
     // Show resize cursors when hovering over handles
     if (activeTool === 'SELECT' && hoverHandle && interactionMode === 'none') {
         switch (hoverHandle) {

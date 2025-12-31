@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { AnnotationTool } from '../types';
 import { FONT_SIZES, STROKE_WIDTHS, STAMPS } from '../constants';
 import {
-    SelectIcon, PenIcon, HighlighterIcon, FreeTextIcon, RectangleIcon, CircleIcon, TrashIcon,
+    SelectIcon, PanIcon, PenIcon, HighlighterIcon, FreeTextIcon, RectangleIcon, CircleIcon, TrashIcon,
     ZoomInIcon, ZoomOutIcon, DownloadIcon, PrintIcon, UnderlineIcon, StrikeoutIcon, SquigglyIcon,
     StampIcon, SignatureIcon, InitialsIcon, UndoIcon, RedoIcon, MoreIcon
 } from './Icons';
@@ -97,6 +97,7 @@ const Toolbar: React.FC<ToolbarProps> = (props) => {
 
   const annotationTools: { tool: AnnotationTool, icon: React.ReactNode, label: string }[] = [
     { tool: 'SELECT', icon: <SelectIcon />, label: 'Select' },
+    { tool: 'PAN', icon: <PanIcon />, label: 'Pan' },
     { tool: 'PEN', icon: <PenIcon />, label: 'Pen' },
     { tool: 'HIGHLIGHTER', icon: <HighlighterIcon />, label: 'Highlighter' },
   ];

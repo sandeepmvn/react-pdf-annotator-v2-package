@@ -1,6 +1,7 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist/types/src/display/api';
+import { TextLayer } from 'pdfjs-dist';
 import AnnotationLayer from './AnnotationLayer';
 import { Annotation, AnnotationTool } from '../types';
 
@@ -27,6 +28,7 @@ interface PdfPageProps {
 const PdfPage: React.FC<PdfPageProps> = (props) => {
   const { pdf, pageNumber, zoom } = props;
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const textLayerRef = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState<PDFPageProxy | null>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const renderTaskRef = useRef<any>(null);
@@ -56,12 +58,24 @@ const PdfPage: React.FC<PdfPageProps> = (props) => {
         canvasContext: context,
         viewport: viewport,
       };
-      
+
       const renderTask = page.render(renderContext);
       renderTaskRef.current = renderTask;
-      
-      renderTask.promise.then(() => {
+
+      renderTask.promise.then(async () => {
         renderTaskRef.current = null;
+
+        // Render text layer for text selection
+        if (textLayerRef.current) {
+          textLayerRef.current.innerHTML = '';
+          const textContent = await page.getTextContent();
+          const textLayer = new TextLayer({
+            textContentSource: textContent,
+            container: textLayerRef.current,
+            viewport: viewport,
+          });
+          await textLayer.render();
+        }
       }).catch((err: any) => {
         if (err.name !== 'RenderingCancelledException') {
           console.error('Error rendering page:', err);
@@ -82,9 +96,21 @@ const PdfPage: React.FC<PdfPageProps> = (props) => {
   return (
     <div
       className="relative my-4 shadow-lg mx-auto print-page"
-      style={{ width: dimensions.width, height: dimensions.height }}
+      style={{
+        width: dimensions.width,
+        height: dimensions.height,
+        userSelect: 'text'
+      }}
     >
-      <canvas ref={canvasRef} />
+      <canvas ref={canvasRef} style={{ userSelect: 'none' }} />
+      <div
+        ref={textLayerRef}
+        className="textLayer"
+        style={{
+          width: dimensions.width,
+          height: dimensions.height
+        }}
+      />
       {dimensions.width > 0 && (
         <AnnotationLayer
           {...props}

@@ -75,6 +75,8 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
   const { annotations, addAnnotation, deleteAnnotation, updateAnnotation, clearAnnotations, undo, redo, canUndo, canRedo, setAnnotations,historyState,setHistoryState } = useAnnotationHistory();
   const viewerRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
   // Notify parent component whenever annotations change
   useEffect(() => {
@@ -513,6 +515,37 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
     }
   }, [generateAnnotatedPdf, fileName, annotations, historyState, onSave, onPrint]);
 
+  const handlePanMouseDown = (e: React.MouseEvent) => {
+    if (activeTool === 'PAN' && viewerRef.current) {
+      setIsPanning(true);
+      setPanStart({
+        x: e.clientX + viewerRef.current.scrollLeft,
+        y: e.clientY + viewerRef.current.scrollTop
+      });
+      if (viewerRef.current) {
+        viewerRef.current.style.cursor = 'grabbing';
+      }
+    }
+  };
+
+  const handlePanMouseMove = (e: React.MouseEvent) => {
+    if (isPanning && viewerRef.current && activeTool === 'PAN') {
+      const dx = panStart.x - e.clientX;
+      const dy = panStart.y - e.clientY;
+      viewerRef.current.scrollLeft = dx;
+      viewerRef.current.scrollTop = dy;
+    }
+  };
+
+  const handlePanMouseUp = () => {
+    if (isPanning) {
+      setIsPanning(false);
+      if (viewerRef.current) {
+        viewerRef.current.style.cursor = 'grab';
+      }
+    }
+  };
+
   const renderPages = () => {
     if (!pdf) return null;
     const pages = [];
@@ -586,7 +619,18 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         setActiveStamp={setActiveStamp}
         readonly={readonly}
       />
-      <div ref={viewerRef} className="bg-gray-50 p-4 overflow-y-auto flex-1">
+      <div
+        ref={viewerRef}
+        className="bg-gray-50 p-4 overflow-auto flex-1"
+        style={{
+          cursor: activeTool === 'PAN' ? (isPanning ? 'grabbing' : 'grab') : 'default',
+          userSelect: activeTool === 'PAN' ? 'none' : 'text'
+        }}
+        onMouseDown={handlePanMouseDown}
+        onMouseMove={handlePanMouseMove}
+        onMouseUp={handlePanMouseUp}
+        onMouseLeave={handlePanMouseUp}
+      >
         <div id="pdf-print-area" className="mx-auto">
           {pdf ? renderPages() : <div className="flex items-center justify-center h-full"><p className="text-xl">Loading PDF...</p></div>}
         </div>
