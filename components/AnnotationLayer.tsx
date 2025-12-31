@@ -443,8 +443,37 @@ function moveAnnotation<T extends Annotation>(ann: T, dx: number, dy: number): T
 
 function resizeAnnotation<T extends Annotation>(ann: T, handle: ResizeHandle, dx: number, dy: number): T {
     const newAnn = JSON.parse(JSON.stringify(ann));
-    // This is a simplified resize logic. A full implementation would be more complex.
-    if (newAnn.type === 'RECTANGLE' || newAnn.type === 'SIGNATURE' || newAnn.type === 'INITIALS' || newAnn.type === 'STAMP' || newAnn.type === 'TEXT') {
+
+    // Handle circle resizing
+    if (newAnn.type === 'CIRCLE') {
+        // Resize radii based on handle position
+        if (handle.includes('l')) {
+            newAnn.cx += dx / 2;
+            newAnn.rx -= dx / 2;
+        }
+        if (handle.includes('r')) {
+            newAnn.cx += dx / 2;
+            newAnn.rx += dx / 2;
+        }
+        if (handle.includes('t')) {
+            newAnn.cy += dy / 2;
+            newAnn.ry -= dy / 2;
+        }
+        if (handle.includes('b')) {
+            newAnn.cy += dy / 2;
+            newAnn.ry += dy / 2;
+        }
+
+        // Ensure minimum radius
+        if (newAnn.rx < 10) newAnn.rx = 10;
+        if (newAnn.ry < 10) newAnn.ry = 10;
+
+        // Keep radii positive
+        if (newAnn.rx < 0) newAnn.rx *= -1;
+        if (newAnn.ry < 0) newAnn.ry *= -1;
+    }
+    // Handle rectangle-like shapes
+    else if (newAnn.type === 'RECTANGLE' || newAnn.type === 'SIGNATURE' || newAnn.type === 'INITIALS' || newAnn.type === 'STAMP' || newAnn.type === 'TEXT') {
         if (handle.includes('l')) { newAnn.x += dx; newAnn.width -= dx; }
         if (handle.includes('r')) { newAnn.width += dx; }
         if (handle.includes('t')) { newAnn.y += dy; newAnn.height -= dy; }
