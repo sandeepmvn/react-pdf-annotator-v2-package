@@ -51,8 +51,14 @@ const PdfPage: React.FC<PdfPageProps> = (props) => {
       }
 
       const viewport = page.getViewport({ scale: zoom });
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
+      const outputScale = window.devicePixelRatio || 1;
+
+      canvas.width = Math.floor(viewport.width * outputScale);
+      canvas.height = Math.floor(viewport.height * outputScale);
+      canvas.style.width = `${viewport.width}px`;
+      canvas.style.height = `${viewport.height}px`;
+
+      context.setTransform(outputScale, 0, 0, outputScale, 0, 0);
       setDimensions({ width: viewport.width, height: viewport.height });
 
       const renderContext = {
