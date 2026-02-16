@@ -7,7 +7,7 @@ import PdfPage from './PdfPage';
 import SignatureModal from './modals/SignatureModal';
 import { useAnnotationHistory,HistoryState } from '../hooks/useAnnotationHistory';
 import { AnnotationTool, Annotation } from '../types';
-import { PDFDocument, rgb, StandardFonts, LineCapStyle, PDFImage } from 'pdf-lib';
+import { PDFDocument, rgb, StandardFonts, LineCapStyle, PDFImage, degrees } from 'pdf-lib';
 import { DEFAULT_COLOR, DEFAULT_FONT_SIZE, DEFAULT_STROKE_WIDTH } from '../constants';
 
 // Configure the worker for pdfjs-dist
@@ -16,6 +16,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs
 export interface AnnotationExportData {
   annotations: Record<number, Annotation[]>;
   historyState: HistoryState;
+  pageRotations?: Record<number, number>;
 }
 
 export interface PdfViewerRef {
@@ -38,11 +39,11 @@ interface PdfViewerProps {
 const ANNOTATION_METADATA_SUBJECT_PREFIX = 'PDF_ANNOTATOR_DATA::';
 
 // Helper to safely get annotation data, handling potential circular references
-const safeGetAnnotationData = (annotations: Record<number, Annotation[]>, historyState: HistoryState): AnnotationExportData => {
+const safeGetAnnotationData = (annotations: Record<number, Annotation[]>, historyState: HistoryState, pageRotations?: Record<number, number>): AnnotationExportData => {
   try {
     // Try to stringify to check for issues
     JSON.stringify(historyState);
-    return { annotations, historyState };
+    return { annotations, historyState, pageRotations };
   } catch (error) {
     console.warn('Full history state has circular references or is too large, using current state only', error);
     // Return simplified version with only current annotations
@@ -51,7 +52,8 @@ const safeGetAnnotationData = (annotations: Record<number, Annotation[]>, histor
       historyState: {
         history: [annotations],
         index: 0
-      }
+      },
+      pageRotations
     };
   }
 };
@@ -71,12 +73,46 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
   const [initialsData, setInitialsData] = useState<string | null>(null);
   const [showSignatureModal, setShowSignatureModal] = useState<'SIGNATURE' | 'INITIALS' | null>(null);
   const [activeStamp, setActiveStamp] = useState<string>('APPROVED');
+  const [pageRotations, setPageRotations] = useState<Record<number, number>>({});
 
   const { annotations, addAnnotation, deleteAnnotation, updateAnnotation, clearAnnotations, undo, redo, canUndo, canRedo, setAnnotations,historyState,setHistoryState } = useAnnotationHistory();
   const viewerRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+
+  const rotatePage = useCallback((pageNum: number, direction: 'cw' | 'ccw') => {
+    setPageRotations(prev => {
+      const current = prev[pageNum] || 0;
+      const delta = direction === 'cw' ? 90 : -90;
+      const newRotation = ((current + delta) % 360 + 360) % 360;
+      return { ...prev, [pageNum]: newRotation };
+    });
+  }, []);
+
+  // Track which page is currently visible via IntersectionObserver
+  useEffect(() => {
+    if (!viewerRef.current || totalPages === 0) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        let bestPage = 0;
+        let bestRatio = 0;
+        entries.forEach(entry => {
+          const pageNum = Number(entry.target.getAttribute('data-page-number'));
+          if (pageNum && entry.intersectionRatio > bestRatio) {
+            bestPage = pageNum;
+            bestRatio = entry.intersectionRatio;
+          }
+        });
+        if (bestPage > 0) {
+          setCurrentPage(bestPage);
+        }
+      },
+      { root: viewerRef.current, threshold: [0, 0.25, 0.5, 0.75, 1] }
+    );
+    pageRefs.current.forEach(el => { if (el) observer.observe(el); });
+    return () => observer.disconnect();
+  }, [totalPages]);
 
   // Notify parent component whenever annotations change
   useEffect(() => {
@@ -125,8 +161,11 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
           if (subject && subject.startsWith(ANNOTATION_METADATA_SUBJECT_PREFIX)) {
               try {
                 const jsonString = subject.substring(ANNOTATION_METADATA_SUBJECT_PREFIX.length);
-                const parsedState = JSON.parse(jsonString) as HistoryState;
-                setHistoryState(parsedState);
+                const parsedState = JSON.parse(jsonString);
+                if (parsedState.pageRotations) {
+                  setPageRotations(parsedState.pageRotations);
+                }
+                setHistoryState({ history: parsedState.history, index: parsedState.index });
               } catch (parseError) {
                 console.error('Failed to parse annotation metadata:', parseError);
               }
@@ -202,7 +241,8 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
 
     // Embed the full annotation history state into the Subject metadata field
     try {
-      const historyJson = JSON.stringify(historyState);
+      const metadataPayload = { ...historyState, pageRotations };
+      const historyJson = JSON.stringify(metadataPayload);
       const metadataString = ANNOTATION_METADATA_SUBJECT_PREFIX + historyJson;
 
       // PDF metadata fields have size limits - check if it's too large
@@ -210,14 +250,13 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         // Store only current annotations instead of full history
         const currentStateOnly = {
           history: [annotations],
-          index: 0
+          index: 0,
+          pageRotations
         };
         const simplifiedJson = JSON.stringify(currentStateOnly);
         pdfDoc.setSubject(ANNOTATION_METADATA_SUBJECT_PREFIX + simplifiedJson);
-       // console.log('Saved simplified annotation data to PDF metadata (full history too large)');
       } else {
         pdfDoc.setSubject(metadataString);
-        //console.log('Saved full annotation history to PDF metadata');
       }
     } catch (error) {
       console.error('Failed to serialize history state:', error);
@@ -225,12 +264,23 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
       try {
         const currentStateOnly = {
           history: [annotations],
-          index: 0
+          index: 0,
+          pageRotations
         };
         const simplifiedJson = JSON.stringify(currentStateOnly);
         pdfDoc.setSubject(ANNOTATION_METADATA_SUBJECT_PREFIX + simplifiedJson);
       } catch (fallbackError) {
         console.error('Failed to serialize even current annotations:', fallbackError);
+      }
+    }
+
+    // Apply page rotations
+    const pdfLibPages = pdfDoc.getPages();
+    for (let pageNum = 1; pageNum <= pdfLibPages.length; pageNum++) {
+      const rotation = pageRotations[pageNum] || 0;
+      if (rotation !== 0) {
+        const existingRotation = pdfLibPages[pageNum - 1].getRotation().angle;
+        pdfLibPages[pageNum - 1].setRotation(degrees((existingRotation + rotation) % 360));
       }
     }
 
@@ -243,7 +293,6 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
     console.log('Rendering annotations onto PDF');
     const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const helveticaBoldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    const pdfLibPages = pdfDoc.getPages();
 
     const embeddedImages: Record<string, PDFImage> = {};
 
@@ -412,7 +461,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         }
     }
     return await pdfDoc.save();
-  }, [pdf, fileUrl, annotations,historyState]);
+  }, [pdf, fileUrl, annotations, historyState, pageRotations]);
 
   // Expose methods to parent component via ref
   useImperativeHandle(ref, () => ({
@@ -438,14 +487,14 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
       }
     },
     getAnnotationData: () => {
-      const data = safeGetAnnotationData(annotations, historyState);
+      const data = safeGetAnnotationData(annotations, historyState, pageRotations);
       // Call the callback if provided
       if (onGetAnnotationData) {
         onGetAnnotationData(data);
       }
       return data;
     }
-  }), [generateAnnotatedPdf, annotations, historyState, onGetAnnotationData]);
+  }), [generateAnnotatedPdf, annotations, historyState, pageRotations, onGetAnnotationData]);
 
   const handleAction = useCallback(async (action: 'download' | 'print') => {
     setIsProcessing(true);
@@ -460,7 +509,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         }
 
         // Prepare annotation data to send to callbacks (safely handle large/circular data)
-       const annotationData = safeGetAnnotationData(annotations, historyState);
+       const annotationData = safeGetAnnotationData(annotations, historyState, pageRotations);
 
         const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
@@ -513,7 +562,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
     } finally {
         setIsProcessing(false);
     }
-  }, [generateAnnotatedPdf, fileName, annotations, historyState, onSave, onPrint]);
+  }, [generateAnnotatedPdf, fileName, annotations, historyState, pageRotations, onSave, onPrint]);
 
   const handlePanMouseDown = (e: React.MouseEvent) => {
     if (activeTool === 'PAN' && viewerRef.current) {
@@ -556,6 +605,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
               pdf={pdf}
               pageNumber={i}
               zoom={zoom}
+              rotation={pageRotations[i] || 0}
               activeTool={activeTool}
               toolColor={toolColor}
               strokeWidth={strokeWidth}
@@ -617,6 +667,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         onInitialsClick={() => setShowSignatureModal('INITIALS')}
         activeStamp={activeStamp}
         setActiveStamp={setActiveStamp}
+        onRotate={() => rotatePage(currentPage, 'cw')}
         readonly={readonly}
       />
       <div

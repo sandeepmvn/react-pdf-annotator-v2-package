@@ -47,7 +47,15 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
   const [hoverHandle, setHoverHandle] = useState<ResizeHandle | null>(null);
 
   const getMousePos = (e: ReactMouseEvent): Point => {
-    const rect = e.currentTarget.getBoundingClientRect();
+    const svg = e.currentTarget as SVGSVGElement;
+    const ctm = svg.getScreenCTM();
+    if (ctm) {
+      const pt = new DOMPoint(e.clientX, e.clientY);
+      const svgPt = pt.matrixTransform(ctm.inverse());
+      return { x: svgPt.x / zoom, y: svgPt.y / zoom };
+    }
+    // Fallback if getScreenCTM is unavailable
+    const rect = svg.getBoundingClientRect();
     return {
       x: (e.clientX - rect.left) / zoom,
       y: (e.clientY - rect.top) / zoom,

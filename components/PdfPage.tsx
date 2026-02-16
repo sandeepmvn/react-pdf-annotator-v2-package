@@ -1,7 +1,7 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist/types/src/display/api';
-import { TextLayer } from 'pdfjs-dist';
+import { renderTextLayer } from 'pdfjs-dist';
 import AnnotationLayer from './AnnotationLayer';
 import { Annotation, AnnotationTool } from '../types';
 
@@ -9,6 +9,7 @@ interface PdfPageProps {
   pdf: PDFDocumentProxy;
   pageNumber: number;
   zoom: number;
+  rotation: number;
   activeTool: AnnotationTool;
   toolColor: string;
   strokeWidth: number;
@@ -26,7 +27,7 @@ interface PdfPageProps {
 }
 
 const PdfPage: React.FC<PdfPageProps> = (props) => {
-  const { pdf, pageNumber, zoom } = props;
+  const { pdf, pageNumber, zoom, rotation } = props;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState<PDFPageProxy | null>(null);
@@ -69,12 +70,12 @@ const PdfPage: React.FC<PdfPageProps> = (props) => {
         if (textLayerRef.current) {
           textLayerRef.current.innerHTML = '';
           const textContent = await page.getTextContent();
-          const textLayer = new TextLayer({
+          const textLayerTask = renderTextLayer({
             textContentSource: textContent,
             container: textLayerRef.current,
             viewport: viewport,
           });
-          await textLayer.render();
+          await textLayerTask.promise;
         }
       }).catch((err: any) => {
         if (err.name !== 'RenderingCancelledException') {
@@ -93,31 +94,48 @@ const PdfPage: React.FC<PdfPageProps> = (props) => {
     };
   }, [page, zoom]);
 
+  const isRotated90or270 = rotation === 90 || rotation === 270;
+  const outerWidth = isRotated90or270 ? dimensions.height : dimensions.width;
+  const outerHeight = isRotated90or270 ? dimensions.width : dimensions.height;
+
   return (
     <div
       className="relative my-4 shadow-lg mx-auto print-page"
       style={{
-        width: dimensions.width,
-        height: dimensions.height,
-        userSelect: 'text'
+        width: outerWidth,
+        height: outerHeight,
+        overflow: 'hidden',
       }}
     >
-      <canvas ref={canvasRef} style={{ userSelect: 'none' }} />
       <div
-        ref={textLayerRef}
-        className="textLayer"
         style={{
           width: dimensions.width,
-          height: dimensions.height
+          height: dimensions.height,
+          transform: rotation ? `rotate(${rotation}deg)` : undefined,
+          transformOrigin: 'center center',
+          position: 'absolute',
+          left: (outerWidth - dimensions.width) / 2,
+          top: (outerHeight - dimensions.height) / 2,
+          userSelect: 'text',
         }}
-      />
-      {dimensions.width > 0 && (
-        <AnnotationLayer
-          {...props}
-          width={dimensions.width}
-          height={dimensions.height}
+      >
+        <canvas ref={canvasRef} style={{ userSelect: 'none' }} />
+        <div
+          ref={textLayerRef}
+          className="textLayer"
+          style={{
+            width: dimensions.width,
+            height: dimensions.height
+          }}
         />
-      )}
+        {dimensions.width > 0 && (
+          <AnnotationLayer
+            {...props}
+            width={dimensions.width}
+            height={dimensions.height}
+          />
+        )}
+      </div>
     </div>
   );
 };

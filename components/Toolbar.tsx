@@ -5,7 +5,7 @@ import { FONT_SIZES, STROKE_WIDTHS, STAMPS } from '../constants';
 import {
     SelectIcon, PanIcon, PenIcon, HighlighterIcon, FreeTextIcon, RectangleIcon, CircleIcon, TrashIcon,
     ZoomInIcon, ZoomOutIcon, DownloadIcon, PrintIcon, UnderlineIcon, StrikeoutIcon, SquigglyIcon,
-    StampIcon, SignatureIcon, InitialsIcon, UndoIcon, RedoIcon, MoreIcon
+    StampIcon, SignatureIcon, InitialsIcon, UndoIcon, RedoIcon, MoreIcon, RotateIcon
 } from './Icons';
 
 interface ToolbarProps {
@@ -36,6 +36,7 @@ interface ToolbarProps {
   onInitialsClick: () => void;
   activeStamp: string;
   setActiveStamp: (stamp: string) => void;
+  onRotate: () => void;
   readonly?: boolean;
 }
 
@@ -65,7 +66,7 @@ const Toolbar: React.FC<ToolbarProps> = (props) => {
     toolColor, setToolColor, strokeWidth, setStrokeWidth, fontSize, setFontSize,
     onDownload, onPrint, isProcessing, onDelete, selectedAnnotationId,
     undo, redo, canUndo, canRedo, onSignatureClick, onInitialsClick, activeStamp, setActiveStamp,
-    readonly = false
+    onRotate, readonly = false
   } = props;
 
   const [showDropdown, setShowDropdown] = useState(false);
@@ -127,6 +128,10 @@ const Toolbar: React.FC<ToolbarProps> = (props) => {
               <span className="mx-2">/</span><span>{totalPages}</span>
             </div>
             <button onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage >= totalPages} className="p-2 rounded-md hover:bg-gray-200 disabled:opacity-50 text-gray-800 transition-colors">›</button>
+          </div>
+          <div className="w-px h-6 bg-gray-300"></div>
+          <div className="flex items-center gap-1">
+            <ToolButton label="Rotate Page" onClick={onRotate}><RotateIcon /></ToolButton>
           </div>
           <div className="w-px h-6 bg-gray-300"></div>
           <div className="flex items-center gap-2">

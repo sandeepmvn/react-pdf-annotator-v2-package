@@ -82,7 +82,7 @@ When you make changes:
 2. Rebuild and publish:
 ```bash
 npm run build:lib
-npm publish
+npm publish  
 ```
 
 ## Quick Commands Reference
