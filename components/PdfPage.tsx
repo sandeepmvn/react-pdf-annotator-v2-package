@@ -131,7 +131,8 @@ const PdfPage: React.FC<PdfPageProps> = (props) => {
           className="textLayer"
           style={{
             width: dimensions.width,
-            height: dimensions.height
+            height: dimensions.height,
+            ['--scale-factor' as string]: zoom,
           }}
         />
         {dimensions.width > 0 && (
