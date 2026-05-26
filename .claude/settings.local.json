@@ -4,7 +4,9 @@
       "Bash(curl:*)",
       "Bash(npm run build:lib:*)",
       "Bash(git checkout:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(npm publish *)",
+      "Bash(npm whoami *)"
     ]
   }
 }
