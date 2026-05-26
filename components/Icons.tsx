@@ -101,6 +101,14 @@ export const MoreIcon = () => (
     <svg {...iconProps}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" /></svg>
 );
 
+export const LineIcon = () => (
+    <svg {...iconProps}><path strokeLinecap="round" strokeLinejoin="round" d="M4 20L20 4" /></svg>
+);
+
+export const RedactIcon = () => (
+    <svg {...iconProps}><rect x="3" y="8" width="18" height="8" fill="currentColor" rx="1" stroke="none" /></svg>
+);
+
 export const RotateIcon = () => (
     <svg {...iconProps}>
       <path
@@ -114,4 +122,13 @@ export const RotateIcon = () => (
         d="M3.75 12A8.25 8.25 0 0012 20.25c2.23 0 4.25-.88 5.74-2.31"
       />
     </svg>
+);
+
+export const RotateAllIcon = () => (
+  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#6366f1">
+    <path strokeLinecap="round" strokeLinejoin="round"
+      d="M20.25 12A8.25 8.25 0 0012 3.75c-2.23 0-4.25.88-5.74 2.31M3.75 3.75v4.5h4.5" />
+    <path strokeLinecap="round" strokeLinejoin="round"
+      d="M3.75 12A8.25 8.25 0 0012 20.25c2.23 0 4.25-.88 5.74-2.31" />
+  </svg>
 );

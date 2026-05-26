@@ -1,7 +1,8 @@
 
 export type AnnotationTool =
   | 'SELECT' | 'PAN' | 'PEN' | 'HIGHLIGHTER' | 'TEXT' | 'RECTANGLE' | 'CIRCLE'
-  | 'UNDERLINE' | 'STRIKETHROUGH' | 'SQUIGGLY' | 'STAMP' | 'SIGNATURE' | 'INITIALS';
+  | 'UNDERLINE' | 'STRIKETHROUGH' | 'SQUIGGLY' | 'STAMP' | 'SIGNATURE' | 'INITIALS'
+  | 'LINE' | 'REDACT';
 
 export interface Point {
   x: number;
@@ -66,6 +67,22 @@ export interface SquigglyAnnotation extends BaseAnnotation {
   points: Point[];
 }
 
+export interface LineAnnotation extends BaseAnnotation {
+  type: 'LINE';
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+export interface RedactAnnotation extends BaseAnnotation {
+  type: 'REDACT';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface StampAnnotation extends BaseAnnotation {
   type: 'STAMP';
   x: number;
@@ -86,16 +103,18 @@ export interface ImageAnnotation extends BaseAnnotation {
   imageData: string; // base64
 }
 
-export type Annotation = 
-  | PenAnnotation 
-  | HighlighterAnnotation 
-  | TextAnnotation 
+export type Annotation =
+  | PenAnnotation
+  | HighlighterAnnotation
+  | TextAnnotation
   | RectangleAnnotation
   | CircleAnnotation
   | UnderlineAnnotation
   | StrikeoutAnnotation
   | SquigglyAnnotation
   | StampAnnotation
-  | ImageAnnotation;
+  | ImageAnnotation
+  | LineAnnotation
+  | RedactAnnotation;
 
 export type Annotations = Record<number, Annotation[]>;

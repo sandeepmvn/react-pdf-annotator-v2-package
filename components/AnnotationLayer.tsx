@@ -1,6 +1,6 @@
 
-import React, { useState, useRef, MouseEvent as ReactMouseEvent } from 'react';
-import { Annotation, AnnotationTool, Point } from '../types';
+import React, { useState, useRef, useEffect, MouseEvent as ReactMouseEvent } from 'react';
+import { Annotation, AnnotationTool, Point, TextAnnotation } from '../types';
 
 type InteractionMode = 'none' | 'drawing' | 'moving' | 'resizing';
 type ResizeHandle = 'tl' | 'tr' | 'bl' | 'br' | 't' | 'r' | 'b' | 'l';
@@ -43,7 +43,8 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
 
   const [tempAnnotation, setTempAnnotation] = useState<Annotation | null>(null);
   const textInputRef = useRef<HTMLTextAreaElement>(null);
-  const [isTexting, setIsTexting] = useState<Point | null>(null);
+  // When editing an existing text annotation: store its id and position
+  const [editingText, setEditingText] = useState<{ pos: Point; existingId?: string } | null>(null);
   const [hoverHandle, setHoverHandle] = useState<ResizeHandle | null>(null);
 
   const getMousePos = (e: ReactMouseEvent): Point => {
@@ -54,7 +55,6 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
       const svgPt = pt.matrixTransform(ctm.inverse());
       return { x: svgPt.x / zoom, y: svgPt.y / zoom };
     }
-    // Fallback if getScreenCTM is unavailable
     const rect = svg.getBoundingClientRect();
     return {
       x: (e.clientX - rect.left) / zoom,
@@ -62,15 +62,19 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
     };
   };
 
+  // Focus textarea whenever editingText is set
+  useEffect(() => {
+    if (editingText) {
+      setTimeout(() => textInputRef.current?.focus(), 0);
+    }
+  }, [editingText]);
+
   const handleMouseDown = (e: ReactMouseEvent) => {
     if (readonly) return;
 
     const pos = getMousePos(e);
 
-    // PAN mode - don't handle here, let the parent container handle it
-    if (activeTool === 'PAN') {
-      return;
-    }
+    if (activeTool === 'PAN') return;
 
     if (activeTool === 'SELECT') {
         const selectedAnn = annotations.find(ann => ann.id === selectedAnnotationId);
@@ -83,7 +87,7 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
                     const handleSize = 8 / zoom;
                     if (pos.x >= handlePos.x - handleSize / 2 && pos.x <= handlePos.x + handleSize / 2 &&
                         pos.y >= handlePos.y - handleSize / 2 && pos.y <= handlePos.y + handleSize / 2) {
-                        
+
                         setInteraction({ mode: 'resizing', handle: handleKey as ResizeHandle, startPos: pos, originalAnnotation: selectedAnn });
                         return;
                     }
@@ -94,7 +98,7 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
                 return;
             }
         }
-        
+
         const clickedAnn = annotations.slice().reverse().find(ann => isPointInAnnotation(pos, ann, zoom));
         setSelectedAnnotationId(clickedAnn ? clickedAnn.id : null);
         if (clickedAnn) {
@@ -109,6 +113,12 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
     if (['PEN', 'HIGHLIGHTER', 'UNDERLINE', 'STRIKETHROUGH', 'SQUIGGLY'].includes(activeTool)) {
       setTempAnnotation({ type: activeTool, points: [pos], color: toolColor, strokeWidth, id: 'temp', page: 0 } as any);
     }
+    if (activeTool === 'LINE') {
+      setTempAnnotation({ type: 'LINE', x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y, color: toolColor, strokeWidth, id: 'temp', page: 0 } as any);
+    }
+    if (activeTool === 'REDACT') {
+      setTempAnnotation({ type: 'REDACT', x: pos.x, y: pos.y, width: 0, height: 0, color: '#000000', strokeWidth: 0, id: 'temp', page: 0 } as any);
+    }
   };
 
   const handleMouseMove = (e: ReactMouseEvent) => {
@@ -116,7 +126,6 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
 
     const currentPos = getMousePos(e);
 
-    // Update hover handle for cursor changes when in SELECT mode
     if (activeTool === 'SELECT' && interaction.mode === 'none' && selectedAnnotationId) {
         const selectedAnn = annotations.find(ann => ann.id === selectedAnnotationId);
         if (selectedAnn) {
@@ -169,6 +178,12 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
             case 'CIRCLE':
                 newAnn = { type: 'CIRCLE', cx: (startPos.x + currentPos.x) / 2, cy: (startPos.y + currentPos.y) / 2, rx: Math.abs(startPos.x - currentPos.x) / 2, ry: Math.abs(startPos.y - currentPos.y) / 2, color: toolColor, strokeWidth, id: 'temp', page: 0 };
                 break;
+            case 'LINE':
+                newAnn = { type: 'LINE', x1: startPos.x, y1: startPos.y, x2: currentPos.x, y2: currentPos.y, color: toolColor, strokeWidth, id: 'temp', page: 0 };
+                break;
+            case 'REDACT':
+                newAnn = { type: 'REDACT', x: Math.min(startPos.x, currentPos.x), y: Math.min(startPos.y, currentPos.y), width: Math.abs(startPos.x - currentPos.x), height: Math.abs(startPos.y - currentPos.y), color: '#000000', strokeWidth: 0, id: 'temp', page: 0 };
+                break;
         }
         if (newAnn) setTempAnnotation(newAnn);
     }
@@ -176,16 +191,33 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
 
   const handleMouseUp = () => {
     if (readonly) return;
-    
+
     if (interaction.mode === 'moving' || interaction.mode === 'resizing') {
         if (tempAnnotation) {
             updateAnnotation(tempAnnotation);
         }
     } else if (interaction.mode === 'drawing' && tempAnnotation) {
         const { id, page, ...rest } = tempAnnotation;
+        // Skip tiny LINE/REDACT draws
+        if (tempAnnotation.type === 'LINE') {
+            const ann = tempAnnotation as any;
+            if (Math.abs(ann.x2 - ann.x1) < 2 && Math.abs(ann.y2 - ann.y1) < 2) {
+                setInteraction({ mode: 'none', startPos: {x:0, y:0} });
+                setTempAnnotation(null);
+                return;
+            }
+        }
+        if (tempAnnotation.type === 'REDACT') {
+            const ann = tempAnnotation as any;
+            if (ann.width < 5 || ann.height < 5) {
+                setInteraction({ mode: 'none', startPos: {x:0, y:0} });
+                setTempAnnotation(null);
+                return;
+            }
+        }
         addAnnotation(rest as any);
     }
-    
+
     setInteraction({ mode: 'none', startPos: {x:0, y:0} });
     setTempAnnotation(null);
   };
@@ -194,10 +226,31 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
     if (readonly) return;
     if (interaction.mode !== 'none') return;
     const pos = getMousePos(e);
-    
+
     if (activeTool === 'TEXT') {
-      setIsTexting(pos);
-      setTimeout(() => textInputRef.current?.focus(), 0);
+      // Check if we clicked on an existing text annotation to edit it
+      const clickedTextAnn = annotations.slice().reverse().find(
+        ann => ann.type === 'TEXT' && isPointInAnnotation(pos, ann, zoom)
+      ) as TextAnnotation | undefined;
+
+      if (clickedTextAnn) {
+        setEditingText({ pos: { x: clickedTextAnn.x, y: clickedTextAnn.y }, existingId: clickedTextAnn.id });
+        // Pre-fill textarea with existing content — done via effect + ref
+        setTimeout(() => {
+          if (textInputRef.current) {
+            textInputRef.current.value = clickedTextAnn.content;
+            textInputRef.current.focus();
+          }
+        }, 0);
+      } else {
+        setEditingText({ pos });
+        setTimeout(() => {
+          if (textInputRef.current) {
+            textInputRef.current.value = '';
+            textInputRef.current.focus();
+          }
+        }, 0);
+      }
     }
     if (activeTool === 'STAMP') {
         const now = new Date();
@@ -214,32 +267,71 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
 
   const handleTextBlur = () => {
     if (readonly) return;
-    if (!isTexting || !textInputRef.current) return;
+    if (!editingText || !textInputRef.current) return;
     const content = textInputRef.current.value.trim();
-    if (content) {
-      addAnnotation({
-        type: 'TEXT',
-        x: isTexting.x,
-        y: isTexting.y,
-        width: textInputRef.current.offsetWidth / zoom,
-        height: textInputRef.current.offsetHeight / zoom,
-        content,
-        fontSize: fontSize,
-        color: toolColor,
-        strokeWidth: 1,
-      } as any);
+
+    if (editingText.existingId) {
+      // Editing an existing annotation
+      const existing = annotations.find(a => a.id === editingText.existingId) as TextAnnotation | undefined;
+      if (existing) {
+        if (content) {
+          updateAnnotation({
+            ...existing,
+            content,
+            width: Math.max(existing.width, textInputRef.current.offsetWidth / zoom),
+            height: textInputRef.current.offsetHeight / zoom,
+          });
+        } else {
+          deleteAnnotation(editingText.existingId);
+        }
+      }
+    } else {
+      // Creating a new annotation
+      if (content) {
+        addAnnotation({
+          type: 'TEXT',
+          x: editingText.pos.x,
+          y: editingText.pos.y,
+          width: textInputRef.current.offsetWidth / zoom,
+          height: textInputRef.current.offsetHeight / zoom,
+          content,
+          fontSize,
+          color: toolColor,
+          strokeWidth: 1,
+        } as any);
+      }
     }
-    setIsTexting(null);
+    setEditingText(null);
   };
 
-  const annotationsToRender = tempAnnotation 
+  // Allow Tab key inside textarea (for indentation), suppress default
+  const handleTextKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Escape') {
+      setEditingText(null);
+    }
+    // Allow Ctrl+C / Ctrl+V / Ctrl+X natively — no interception needed
+  };
+
+  const annotationsToRender = tempAnnotation
     ? annotations.map(ann => ann.id === tempAnnotation.id ? tempAnnotation : ann)
     : annotations;
   if (interaction.mode === 'drawing' && tempAnnotation && !annotations.find(a => a.id === tempAnnotation.id)) {
       annotationsToRender.push(tempAnnotation);
   }
 
+  // Hide text annotation being edited so textarea overlays it cleanly
+  const filteredAnnotations = editingText?.existingId
+    ? annotationsToRender.filter(a => a.id !== editingText.existingId)
+    : annotationsToRender;
+
   const cursor = getCursor(activeTool, selectedAnnotationId, hoverHandle, interaction.mode);
+
+  // Compute textarea style for editing
+  const editingAnn = editingText?.existingId
+    ? annotations.find(a => a.id === editingText.existingId) as TextAnnotation | undefined
+    : undefined;
+  const textareaFontSize = editingAnn ? editingAnn.fontSize : fontSize;
+  const textareaColor = editingAnn ? editingAnn.color : toolColor;
 
   return (
     <div
@@ -261,30 +353,32 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = (props) => {
           pointerEvents: activeTool === 'PAN' ? 'none' : 'auto'
         }}
       >
-        {annotationsToRender.map(ann => renderAnnotation(ann, selectedAnnotationId, zoom))}
+        {filteredAnnotations.map(ann => renderAnnotation(ann, selectedAnnotationId, zoom))}
       </svg>
-      {isTexting && (
+      {editingText && (
         <textarea
           ref={textInputRef}
           onBlur={handleTextBlur}
+          onKeyDown={handleTextKeyDown}
           style={{
             position: 'absolute',
-            left: isTexting.x * zoom,
-            top: isTexting.y * zoom,
-            border: `1px dashed ${toolColor}`,
-            color: toolColor,
-            background: 'rgba(255,255,255,0.9)',
-            fontSize: `${fontSize}px`,
+            left: editingText.pos.x * zoom,
+            top: editingText.pos.y * zoom,
+            border: `1px dashed ${textareaColor}`,
+            color: textareaColor,
+            background: 'transparent',
+            fontSize: `${textareaFontSize * zoom}px`,
             lineHeight: 1.2,
-            width: 'auto',
+            width: editingAnn ? `${editingAnn.width * zoom}px` : 'auto',
             minWidth: '150px',
             height: 'auto',
-            minHeight: `${fontSize * 1.5}px`,
+            minHeight: `${textareaFontSize * zoom * 1.5}px`,
             resize: 'both',
             outline: 'none',
             overflow: 'auto',
             zIndex: 100,
             fontFamily: 'sans-serif',
+            padding: '2px',
           }}
         />
       )}
@@ -326,11 +420,16 @@ function renderAnnotation(ann: Annotation, selectedId: string | null, zoom: numb
         case 'CIRCLE':
             element = <ellipse cx={ann.cx * zoom} cy={ann.cy * zoom} rx={ann.rx * zoom} ry={ann.ry * zoom} fill="none" {...baseProps} />;
             break;
+        case 'LINE':
+            element = <line x1={ann.x1 * zoom} y1={ann.y1 * zoom} x2={ann.x2 * zoom} y2={ann.y2 * zoom} {...baseProps} strokeLinecap="round" />;
+            break;
+        case 'REDACT':
+            element = <rect x={ann.x * zoom} y={ann.y * zoom} width={ann.width * zoom} height={ann.height * zoom} fill="#000000" stroke="none" />;
+            break;
         case 'TEXT':
             const textLines = ann.content.split('\n');
             element = (
                 <g>
-                    {/* Optional: Show text box background when selected */}
                     {isSelected && (
                         <rect
                             x={ann.x * zoom}
@@ -373,14 +472,15 @@ function renderAnnotation(ann: Annotation, selectedId: string | null, zoom: numb
 function getAnnotationBoundingBox(ann: Annotation): { minX: number; minY: number; maxX: number; maxY: number } | null {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     switch (ann.type) {
-        case 'RECTANGLE': case 'STAMP': case 'SIGNATURE': case 'INITIALS':
+        case 'RECTANGLE': case 'STAMP': case 'SIGNATURE': case 'INITIALS': case 'REDACT':
             return { minX: ann.x, minY: ann.y, maxX: ann.x + ann.width, maxY: ann.y + ann.height };
         case 'TEXT':
-            // Use stored height if available, otherwise calculate from line count
             const textHeight = ann.height || (ann.content.split('\n').length * ann.fontSize * 1.2);
             return { minX: ann.x, minY: ann.y, maxX: ann.x + ann.width, maxY: ann.y + textHeight };
         case 'CIRCLE':
             return { minX: ann.cx - ann.rx, minY: ann.cy - ann.ry, maxX: ann.cx + ann.rx, maxY: ann.cy + ann.ry };
+        case 'LINE':
+            return { minX: Math.min(ann.x1, ann.x2), minY: Math.min(ann.y1, ann.y2), maxX: Math.max(ann.x1, ann.x2), maxY: Math.max(ann.y1, ann.y2) };
         case 'PEN': case 'HIGHLIGHTER': case 'UNDERLINE': case 'STRIKETHROUGH': case 'SQUIGGLY':
             ann.points.forEach(p => {
                 minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
@@ -404,9 +504,7 @@ function renderSelectionBox(box: { minX: number; minY: number; maxX: number; max
 
     return (
         <g>
-            {/* White outline for better visibility */}
             <rect {...rectProps} fill="none" stroke="#ffffff" strokeWidth="3" strokeDasharray="5 5" />
-            {/* Blue main border */}
             <rect {...rectProps} fill="none" stroke="#0ea5e9" strokeWidth="2" strokeDasharray="5 5" />
             {Object.values(handles).map((p, i) => (
                 <rect key={i} x={p.x * zoom - handleSize/2} y={p.y * zoom - handleSize/2} width={handleSize} height={handleSize} fill="#0ea5e9" stroke="#ffffff" strokeWidth="2" />
@@ -439,10 +537,12 @@ function isPointInAnnotation(point: Point, ann: Annotation, zoom: number): boole
 function moveAnnotation<T extends Annotation>(ann: T, dx: number, dy: number): T {
     const newAnn = JSON.parse(JSON.stringify(ann));
     switch (newAnn.type) {
-        case 'RECTANGLE': case 'TEXT': case 'STAMP': case 'SIGNATURE': case 'INITIALS':
+        case 'RECTANGLE': case 'TEXT': case 'STAMP': case 'SIGNATURE': case 'INITIALS': case 'REDACT':
             newAnn.x += dx; newAnn.y += dy; break;
         case 'CIRCLE':
             newAnn.cx += dx; newAnn.cy += dy; break;
+        case 'LINE':
+            newAnn.x1 += dx; newAnn.y1 += dy; newAnn.x2 += dx; newAnn.y2 += dy; break;
         case 'PEN': case 'HIGHLIGHTER': case 'UNDERLINE': case 'STRIKETHROUGH': case 'SQUIGGLY':
             newAnn.points = newAnn.points.map((p: Point) => ({ x: p.x + dx, y: p.y + dy })); break;
     }
@@ -452,44 +552,26 @@ function moveAnnotation<T extends Annotation>(ann: T, dx: number, dy: number): T
 function resizeAnnotation<T extends Annotation>(ann: T, handle: ResizeHandle, dx: number, dy: number): T {
     const newAnn = JSON.parse(JSON.stringify(ann));
 
-    // Handle circle resizing
     if (newAnn.type === 'CIRCLE') {
-        // Resize radii based on handle position
-        if (handle.includes('l')) {
-            newAnn.cx += dx / 2;
-            newAnn.rx -= dx / 2;
-        }
-        if (handle.includes('r')) {
-            newAnn.cx += dx / 2;
-            newAnn.rx += dx / 2;
-        }
-        if (handle.includes('t')) {
-            newAnn.cy += dy / 2;
-            newAnn.ry -= dy / 2;
-        }
-        if (handle.includes('b')) {
-            newAnn.cy += dy / 2;
-            newAnn.ry += dy / 2;
-        }
-
-        // Ensure minimum radius
+        if (handle.includes('l')) { newAnn.cx += dx / 2; newAnn.rx -= dx / 2; }
+        if (handle.includes('r')) { newAnn.cx += dx / 2; newAnn.rx += dx / 2; }
+        if (handle.includes('t')) { newAnn.cy += dy / 2; newAnn.ry -= dy / 2; }
+        if (handle.includes('b')) { newAnn.cy += dy / 2; newAnn.ry += dy / 2; }
         if (newAnn.rx < 10) newAnn.rx = 10;
         if (newAnn.ry < 10) newAnn.ry = 10;
-
-        // Keep radii positive
         if (newAnn.rx < 0) newAnn.rx *= -1;
         if (newAnn.ry < 0) newAnn.ry *= -1;
-    }
-    // Handle rectangle-like shapes
-    else if (newAnn.type === 'RECTANGLE' || newAnn.type === 'SIGNATURE' || newAnn.type === 'INITIALS' || newAnn.type === 'STAMP' || newAnn.type === 'TEXT') {
+    } else if (newAnn.type === 'LINE') {
+        // For lines, tl/bl anchors move x1,y1; tr/br anchors move x2,y2
+        if (handle === 'tl' || handle === 'l' || handle === 'bl') { newAnn.x1 += dx; newAnn.y1 += dy; }
+        if (handle === 'tr' || handle === 'r' || handle === 'br') { newAnn.x2 += dx; newAnn.y2 += dy; }
+    } else if (['RECTANGLE', 'SIGNATURE', 'INITIALS', 'STAMP', 'TEXT', 'REDACT'].includes(newAnn.type)) {
         if (handle.includes('l')) { newAnn.x += dx; newAnn.width -= dx; }
         if (handle.includes('r')) { newAnn.width += dx; }
         if (handle.includes('t')) { newAnn.y += dy; newAnn.height -= dy; }
         if (handle.includes('b')) { newAnn.height += dy; }
         if (newAnn.width < 0) { newAnn.x += newAnn.width; newAnn.width *= -1; }
         if (newAnn.height < 0) { newAnn.y += newAnn.height; newAnn.height *= -1; }
-
-        // Ensure minimum dimensions for TEXT
         if (newAnn.type === 'TEXT') {
             if (newAnn.width < 50) newAnn.width = 50;
             if (!newAnn.height) newAnn.height = newAnn.fontSize * 1.5;
@@ -500,42 +582,22 @@ function resizeAnnotation<T extends Annotation>(ann: T, handle: ResizeHandle, dx
 }
 
 function getCursor(activeTool: AnnotationTool, selectedId: string | null, hoverHandle: ResizeHandle | null, interactionMode: InteractionMode): string {
-    // PAN mode cursor
-    if (activeTool === 'PAN') {
-        return 'grab';
-    }
+    if (activeTool === 'PAN') return 'grab';
 
-    // Show resize cursors when hovering over handles
     if (activeTool === 'SELECT' && hoverHandle && interactionMode === 'none') {
         switch (hoverHandle) {
-            case 'tl':
-            case 'br':
-                return 'nwse-resize';
-            case 'tr':
-            case 'bl':
-                return 'nesw-resize';
-            case 't':
-            case 'b':
-                return 'ns-resize';
-            case 'l':
-            case 'r':
-                return 'ew-resize';
+            case 'tl': case 'br': return 'nwse-resize';
+            case 'tr': case 'bl': return 'nesw-resize';
+            case 't': case 'b': return 'ns-resize';
+            case 'l': case 'r': return 'ew-resize';
         }
     }
 
-    // Show resize cursors during resizing
-    if (interactionMode === 'resizing') {
-        return 'grabbing';
-    }
+    if (interactionMode === 'resizing') return 'grabbing';
+    if (interactionMode === 'moving') return 'grabbing';
 
-    // Show move cursor during moving
-    if (interactionMode === 'moving') {
-        return 'grabbing';
-    }
-
-    // Default cursors for tools
     if (activeTool === 'SELECT') return selectedId ? 'move' : 'default';
-    if (['PEN', 'RECTANGLE', 'CIRCLE', 'HIGHLIGHTER', 'UNDERLINE', 'STRIKETHROUGH', 'SQUIGGLY'].includes(activeTool)) return 'crosshair';
+    if (['PEN', 'RECTANGLE', 'CIRCLE', 'HIGHLIGHTER', 'UNDERLINE', 'STRIKETHROUGH', 'SQUIGGLY', 'LINE', 'REDACT'].includes(activeTool)) return 'crosshair';
     if (activeTool === 'TEXT') return 'text';
     if (['STAMP', 'SIGNATURE', 'INITIALS'].includes(activeTool)) return 'crosshair';
     return 'default';

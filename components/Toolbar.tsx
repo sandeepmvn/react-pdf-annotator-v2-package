@@ -5,7 +5,8 @@ import { FONT_SIZES, STROKE_WIDTHS, STAMPS } from '../constants';
 import {
     SelectIcon, PanIcon, PenIcon, HighlighterIcon, FreeTextIcon, RectangleIcon, CircleIcon, TrashIcon,
     ZoomInIcon, ZoomOutIcon, DownloadIcon, PrintIcon, UnderlineIcon, StrikeoutIcon, SquigglyIcon,
-    StampIcon, SignatureIcon, InitialsIcon, UndoIcon, RedoIcon, MoreIcon, RotateIcon
+    StampIcon, SignatureIcon, InitialsIcon, UndoIcon, RedoIcon, MoreIcon, RotateIcon, RotateAllIcon,
+    LineIcon, RedactIcon
 } from './Icons';
 
 interface ToolbarProps {
@@ -37,6 +38,7 @@ interface ToolbarProps {
   activeStamp: string;
   setActiveStamp: (stamp: string) => void;
   onRotate: () => void;
+  onRotateAll: () => void;
   readonly?: boolean;
 }
 
@@ -66,11 +68,11 @@ const Toolbar: React.FC<ToolbarProps> = (props) => {
     toolColor, setToolColor, strokeWidth, setStrokeWidth, fontSize, setFontSize,
     onDownload, onPrint, isProcessing, onDelete, selectedAnnotationId,
     undo, redo, canUndo, canRedo, onSignatureClick, onInitialsClick, activeStamp, setActiveStamp,
-    onRotate, readonly = false
+    onRotate, onRotateAll, readonly = false
   } = props;
 
   const [showDropdown, setShowDropdown] = useState(false);
-  const [showAnnotationTools, setShowAnnotationTools] = useState(false);
+  const [showAnnotationTools, setShowAnnotationTools] = useState(true);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -106,6 +108,8 @@ const Toolbar: React.FC<ToolbarProps> = (props) => {
   const shapeTools: { tool: AnnotationTool, icon: React.ReactNode, label: string }[] = [
     { tool: 'RECTANGLE', icon: <RectangleIcon />, label: 'Rectangle' },
     { tool: 'CIRCLE', icon: <CircleIcon />, label: 'Circle' },
+    { tool: 'LINE', icon: <LineIcon />, label: 'Straight Line' },
+    { tool: 'REDACT', icon: <RedactIcon />, label: 'Redact (Black Out)' },
   ];
 
   const textTools: { tool: AnnotationTool, icon: React.ReactNode, label: string }[] = [
@@ -132,6 +136,7 @@ const Toolbar: React.FC<ToolbarProps> = (props) => {
           <div className="w-px h-6 bg-gray-300"></div>
           <div className="flex items-center gap-1">
             <ToolButton label="Rotate Page" onClick={onRotate}><RotateIcon /></ToolButton>
+            <ToolButton label="Rotate All Pages" onClick={onRotateAll}><RotateAllIcon /></ToolButton>
           </div>
           <div className="w-px h-6 bg-gray-300"></div>
           <div className="flex items-center gap-2">

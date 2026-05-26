@@ -25,6 +25,15 @@ export default defineConfig(({ mode }) => {
           fileName: (format) => `react-pdf-annotator.${format}.js`,
         },
         rollupOptions: {
+          onwarn(warning, defaultHandler) {
+            if (
+              warning.code === 'EVAL' &&
+              warning.id?.includes('pdfjs-dist/build/pdf.js')
+            ) {
+              return
+            }
+            defaultHandler(warning)
+          },
           external: ['react', 'react-dom', 'react/jsx-runtime'],
           output: {
             globals: {

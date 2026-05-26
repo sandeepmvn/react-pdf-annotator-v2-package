@@ -90,6 +90,18 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
     });
   }, []);
 
+  const rotateAllPages = useCallback((direction: 'cw' | 'ccw') => {
+    setPageRotations(prev => {
+      const delta = direction === 'cw' ? 90 : -90;
+      const next: Record<number, number> = {};
+      for (let i = 1; i <= totalPages; i++) {
+        const current = prev[i] || 0;
+        next[i] = ((current + delta) % 360 + 360) % 360;
+      }
+      return next;
+    });
+  }, [totalPages]);
+
   // Track which page is currently visible via IntersectionObserver
   useEffect(() => {
     if (!viewerRef.current || totalPages === 0) return;
@@ -444,6 +456,25 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
                         });
                     }
                     break;
+                case 'LINE':
+                    pdfLibPage.drawLine({
+                        start: { x: annotation.x1 * scaleX, y: y(annotation.y1) },
+                        end: { x: annotation.x2 * scaleX, y: y(annotation.y2) },
+                        thickness: annotation.strokeWidth * scaleX,
+                        color: color,
+                        opacity: 1,
+                    });
+                    break;
+                case 'REDACT':
+                    pdfLibPage.drawRectangle({
+                        x: annotation.x * scaleX,
+                        y: y(annotation.y + annotation.height),
+                        width: annotation.width * scaleX,
+                        height: annotation.height * scaleY,
+                        color: rgb(0, 0, 0),
+                        borderWidth: 0,
+                    });
+                    break;
                 case 'SIGNATURE':
                 case 'INITIALS':
                     if (!embeddedImages[annotation.imageData]) {
@@ -668,6 +699,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         activeStamp={activeStamp}
         setActiveStamp={setActiveStamp}
         onRotate={() => rotatePage(currentPage, 'cw')}
+        onRotateAll={() => rotateAllPages('cw')}
         readonly={readonly}
       />
       <div
