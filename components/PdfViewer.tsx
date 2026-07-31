@@ -498,7 +498,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
   useImperativeHandle(ref, () => ({
     getAnnotatedDocument: async () => {
       try {
-        const pdfBytes = await generateAnnotatedPdf();
+        const pdfBytes = await generateAnnotatedPdf(true);
         if (!pdfBytes) return null;
         return new Blob([pdfBytes as any], { type: 'application/pdf' });
       } catch (error) {
@@ -508,7 +508,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
     },
     getAnnotatedDocumentUrl: async () => {
       try {
-        const pdfBytes = await generateAnnotatedPdf();
+        const pdfBytes = await generateAnnotatedPdf(true);
         if (!pdfBytes) return null;
         const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
         return URL.createObjectURL(blob);
@@ -530,9 +530,9 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
   const handleAction = useCallback(async (action: 'download' | 'print') => {
     setIsProcessing(true);
     try {
-        // For print: render annotations onto PDF (visual output)
-        // For download: metadata only (editable when reopened)
-        const renderAnnotations = action === 'print';
+        // Render annotations onto the PDF for both download and print,
+        // while the metadata (embedded unconditionally below) still allows reopening for editing.
+        const renderAnnotations = true;
         const pdfBytes = await generateAnnotatedPdf(renderAnnotations);
         if (!pdfBytes) {
             setIsProcessing(false);
