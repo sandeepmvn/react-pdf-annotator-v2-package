@@ -498,7 +498,9 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
   useImperativeHandle(ref, () => ({
     getAnnotatedDocument: async () => {
       try {
-        const pdfBytes = await generateAnnotatedPdf(true);
+        // Metadata-only (no visual rendering) so the document stays cleanly
+        // re-editable when reopened — see FIX_DOUBLE_ANNOTATIONS.md.
+        const pdfBytes = await generateAnnotatedPdf();
         if (!pdfBytes) return null;
         return new Blob([pdfBytes as any], { type: 'application/pdf' });
       } catch (error) {
@@ -508,7 +510,8 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
     },
     getAnnotatedDocumentUrl: async () => {
       try {
-        const pdfBytes = await generateAnnotatedPdf(true);
+        // Metadata-only — see getAnnotatedDocument above.
+        const pdfBytes = await generateAnnotatedPdf();
         if (!pdfBytes) return null;
         const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
         return URL.createObjectURL(blob);
