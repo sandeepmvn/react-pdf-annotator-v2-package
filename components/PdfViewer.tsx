@@ -25,10 +25,11 @@ export interface PdfViewerRef {
   getAnnotationData: () => AnnotationExportData;
 }
 
-interface PdfViewerProps {
+export interface PdfViewerProps {
   fileUrl: string;
   fileName: string;
   readonly?: boolean;
+  enableUpload?: boolean;
   onAnnotationsChange?: (annotations: Record<number, Annotation[]>) => void;
   initialAnnotations?: Record<number, Annotation[]>;
   initialHistoryState?: HistoryState;
@@ -58,7 +59,7 @@ const safeGetAnnotationData = (annotations: Record<number, Annotation[]>, histor
   }
 };
 
-const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName, readonly = false, onAnnotationsChange, initialAnnotations, initialHistoryState, onSave, onPrint, onGetAnnotationData }, ref) => {
+const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName, readonly = false, enableUpload = false, onAnnotationsChange, initialAnnotations, initialHistoryState, onSave, onPrint, onGetAnnotationData }, ref) => {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -74,6 +75,10 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
   const [showSignatureModal, setShowSignatureModal] = useState<'SIGNATURE' | 'INITIALS' | null>(null);
   const [activeStamp, setActiveStamp] = useState<string>('APPROVED');
   const [pageRotations, setPageRotations] = useState<Record<number, number>>({});
+  const [uploadedDoc, setUploadedDoc] = useState<{ url: string; name: string } | null>(null);
+  const uploadedUrlRef = useRef<string | null>(null);
+  const activeFileUrl = uploadedDoc?.url ?? fileUrl;
+  const activeFileName = uploadedDoc?.name ?? fileName;
 
   const { annotations, addAnnotation, deleteAnnotation, updateAnnotation, clearAnnotations, undo, redo, canUndo, canRedo, setAnnotations,historyState,setHistoryState } = useAnnotationHistory();
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -155,7 +160,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
   useEffect(() => {
     const loadPdf = async () => {
       try {
-        const loadingTask = pdfjsLib.getDocument(fileUrl);
+        const loadingTask = pdfjsLib.getDocument(activeFileUrl);
         const pdfDocument = await loadingTask.promise;
         setPdf(pdfDocument);
         setTotalPages(pdfDocument.numPages);
@@ -165,8 +170,8 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
 
         // 2. Load PDF with pdf-lib to check for metadata (only if no initial data provided from props)
         if (!hasPropsRef.current) {
-         
-          const pdfBytes = await fetch(fileUrl).then(res => res.arrayBuffer());
+
+          const pdfBytes = await fetch(activeFileUrl).then(res => res.arrayBuffer());
           const pdfDocForMeta = await PDFDocument.load(pdfBytes);
           const subject = pdfDocForMeta.getSubject();
 
@@ -193,7 +198,38 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
 
     loadPdf();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFileUrl]);
+
+  // If the host app changes the fileUrl prop, drop any uploaded-file override so the prop wins again
+  useEffect(() => {
+    setUploadedDoc(prev => {
+      if (prev) URL.revokeObjectURL(prev.url);
+      return null;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileUrl]);
+
+  // Revoke the object URL of any uploaded file on unmount
+  useEffect(() => {
+    uploadedUrlRef.current = uploadedDoc?.url ?? null;
+  }, [uploadedDoc]);
+  useEffect(() => {
+    return () => {
+      if (uploadedUrlRef.current) URL.revokeObjectURL(uploadedUrlRef.current);
+    };
+  }, []);
+
+  const handleFileUpload = useCallback((file: File) => {
+    if (file.type !== 'application/pdf') return;
+    const objectUrl = URL.createObjectURL(file);
+    setUploadedDoc(prev => {
+      if (prev) URL.revokeObjectURL(prev.url);
+      return { url: objectUrl, name: file.name };
+    });
+    setAnnotations({});
+    setPageRotations({});
+    hasPropsRef.current = false;
+  }, [setAnnotations]);
 
   const handlePageChange = (page: number) => {
     if (page > 0 && page <= totalPages) {
@@ -248,7 +284,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
   const generateAnnotatedPdf = useCallback(async (renderAnnotations: boolean = false) => {
     if (!pdf) return null;
 
-    const existingPdfBytes = await fetch(fileUrl).then(res => res.arrayBuffer());
+    const existingPdfBytes = await fetch(activeFileUrl).then(res => res.arrayBuffer());
     const pdfDoc = await PDFDocument.load(existingPdfBytes);
 
     // Embed the full annotation history state into the Subject metadata field
@@ -492,7 +528,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         }
     }
     return await pdfDoc.save();
-  }, [pdf, fileUrl, annotations, historyState, pageRotations]);
+  }, [pdf, activeFileUrl, annotations, historyState, pageRotations]);
 
   // Expose methods to parent component via ref
   useImperativeHandle(ref, () => ({
@@ -674,7 +710,7 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         />
       )}
       <Toolbar
-        fileName={fileName}
+        fileName={activeFileName}
         currentPage={currentPage}
         totalPages={totalPages}
         zoom={zoom}
@@ -704,6 +740,8 @@ const PdfViewer = forwardRef<PdfViewerRef, PdfViewerProps>(({ fileUrl, fileName,
         onRotate={() => rotatePage(currentPage, 'cw')}
         onRotateAll={() => rotateAllPages('cw')}
         readonly={readonly}
+        enableUpload={enableUpload}
+        onUploadFile={handleFileUpload}
       />
       <div
         ref={viewerRef}

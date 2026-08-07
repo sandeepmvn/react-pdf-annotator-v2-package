@@ -177,6 +177,7 @@ const App: React.FC = () => {
             ref={pdfViewerRef}
             fileUrl={pdfFile}
             fileName={fileName}
+            enableUpload
             onAnnotationsChange={handleAnnotationsChange}
             initialHistoryState={initialHistoryState}
             onSave={handleSave}

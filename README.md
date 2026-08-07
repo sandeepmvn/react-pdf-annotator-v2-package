@@ -65,6 +65,21 @@ To display a PDF without annotation tools (view-only mode):
 />
 ```
 
+### Letting Users Upload Their Own PDF
+
+By default, `PdfViewer` only ever displays the document passed via `fileUrl`. Set
+`enableUpload` to also show a toolbar button that lets the end user pick a local PDF
+file and view/annotate it on the fly (the file stays client-side as an object URL for
+that session — it does not change what `fileUrl` points to):
+
+```tsx
+<PdfViewer 
+  fileUrl="https://example.com/sample.pdf" 
+  fileName="sample.pdf" 
+  enableUpload
+/>
+```
+
 ### Tracking Annotation Changes
 
 To receive real-time updates when annotations are added, modified, or deleted:
@@ -257,6 +272,7 @@ function App() {
 | `fileUrl` | `string` | Yes | - | URL of the PDF file to display |
 | `fileName` | `string` | Yes | - | Name of the PDF file (used for downloads) |
 | `readonly` | `boolean` | No | `false` | Hide annotation tools and prevent editing |
+| `enableUpload` | `boolean` | No | `false` | Show a toolbar button letting the end user pick a local PDF to view/annotate |
 | `onAnnotationsChange` | `(annotations: Annotations) => void` | No | - | Callback fired when annotations change (add/update/delete/undo/redo) |
 | `initialAnnotations` | `Record<number, Annotation[]>` | No | - | Initial annotations to load (basic, without undo history) |
 | `initialHistoryState` | `HistoryState` | No | - | Initial annotation state with full undo/redo history |

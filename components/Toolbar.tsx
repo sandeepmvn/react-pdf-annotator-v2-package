@@ -6,7 +6,7 @@ import {
     SelectIcon, PanIcon, PenIcon, HighlighterIcon, FreeTextIcon, RectangleIcon, CircleIcon, TrashIcon,
     ZoomInIcon, ZoomOutIcon, DownloadIcon, PrintIcon, UnderlineIcon, StrikeoutIcon, SquigglyIcon,
     StampIcon, SignatureIcon, InitialsIcon, UndoIcon, RedoIcon, MoreIcon, RotateIcon, RotateAllIcon,
-    LineIcon, RedactIcon
+    LineIcon, RedactIcon, UploadFileIcon
 } from './Icons';
 
 interface ToolbarProps {
@@ -40,6 +40,8 @@ interface ToolbarProps {
   onRotate: () => void;
   onRotateAll: () => void;
   readonly?: boolean;
+  enableUpload?: boolean;
+  onUploadFile?: (file: File) => void;
 }
 
 const ToolButton: React.FC<{
@@ -68,12 +70,24 @@ const Toolbar: React.FC<ToolbarProps> = (props) => {
     toolColor, setToolColor, strokeWidth, setStrokeWidth, fontSize, setFontSize,
     onDownload, onPrint, isProcessing, onDelete, selectedAnnotationId,
     undo, redo, canUndo, canRedo, onSignatureClick, onInitialsClick, activeStamp, setActiveStamp,
-    onRotate, onRotateAll, readonly = false
+    onRotate, onRotateAll, readonly = false, enableUpload = false, onUploadFile
   } = props;
 
   const [showDropdown, setShowDropdown] = useState(false);
   const [showAnnotationTools, setShowAnnotationTools] = useState(true);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.type !== 'application/pdf') {
+      alert('Please select a valid PDF file.');
+      return;
+    }
+    onUploadFile?.(file);
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -148,6 +162,19 @@ const Toolbar: React.FC<ToolbarProps> = (props) => {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
+          {enableUpload && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={handleFileInputChange}
+              />
+              <ToolButton label="Upload PDF" onClick={() => fileInputRef.current?.click()}><UploadFileIcon /></ToolButton>
+              <div className="w-px h-6 bg-gray-300"></div>
+            </>
+          )}
           {!readonly && (
             <>
               <ToolButton label="Undo" onClick={undo} disabled={!canUndo}><UndoIcon /></ToolButton>
