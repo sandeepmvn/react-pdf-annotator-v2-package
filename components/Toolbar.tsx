@@ -140,12 +140,14 @@ const Toolbar: React.FC<ToolbarProps> = (props) => {
         {/* Page Controls & Zoom */}
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <button onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage <= 1} className="p-2 rounded-md hover:bg-gray-200 disabled:opacity-50 text-gray-800 transition-colors">‹</button>
+            <button title="First Page" aria-label="First Page" onClick={() => setCurrentPage(1)} disabled={currentPage <= 1} className="p-2 rounded-md hover:bg-gray-200 disabled:opacity-50 text-gray-800 transition-colors">«</button>
+            <button title="Previous Page" aria-label="Previous Page" onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage <= 1} className="p-2 rounded-md hover:bg-gray-200 disabled:opacity-50 text-gray-800 transition-colors">‹</button>
             <div className="flex items-center text-gray-800">
               <input type="number" value={currentPage} onChange={handlePageInputChange} className="w-12 text-center bg-white rounded-md border border-gray-300 text-gray-800" />
               <span className="mx-2">/</span><span>{totalPages}</span>
             </div>
-            <button onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage >= totalPages} className="p-2 rounded-md hover:bg-gray-200 disabled:opacity-50 text-gray-800 transition-colors">›</button>
+            <button title="Next Page" aria-label="Next Page" onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage >= totalPages} className="p-2 rounded-md hover:bg-gray-200 disabled:opacity-50 text-gray-800 transition-colors">›</button>
+            <button title="Last Page" aria-label="Last Page" onClick={() => setCurrentPage(totalPages)} disabled={currentPage >= totalPages} className="p-2 rounded-md hover:bg-gray-200 disabled:opacity-50 text-gray-800 transition-colors">»</button>
           </div>
           <div className="w-px h-6 bg-gray-300"></div>
           <div className="flex items-center gap-1">
